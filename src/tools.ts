@@ -205,7 +205,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "List tasks",
       description: "List tasks, optionally filtered by epic/status/tag.",
-      inputSchema: { epic: z.string().optional(), status: z.string().optional(), tag: z.string().optional() },
+      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional() },
     },
     async (f) =>
       run(async () => {

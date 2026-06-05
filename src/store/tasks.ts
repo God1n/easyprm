@@ -6,6 +6,7 @@ import { validateTaskFrontmatter, slugify } from "../schema.js";
 import { nextTaskId } from "../ids.js";
 import { readEpic, listEpics } from "./epics.js";
 import { EasyprmError } from "../errors.js";
+import { detectCycle } from "../dag.js";
 import type { TaskFrontmatter, Ticket } from "../types.js";
 
 interface TaskLocation { epicSlug: string; fileStem: string; }
@@ -87,7 +88,8 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
   const epic = await readEpic(input.epic); // throws NOT_FOUND if missing
   const dependsOn = input.dependsOn ?? [];
   if (dependsOn.length) {
-    const existing = new Set((await loadAllTasks()).map((t) => t.frontmatter.id));
+    const allTasks = await loadAllTasks();
+    const existing = new Set(allTasks.map((t) => t.frontmatter.id));
     const missing = dependsOn.filter((d) => !existing.has(d));
     if (missing.length) {
       throw new EasyprmError("DEPENDENCY_INVALID", `Unknown dependencies: ${missing.join(", ")}`, {
@@ -96,6 +98,42 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
         next_steps: "Create the dependency tasks first, or remove them from depends_on.",
       });
     }
+
+    const id = await nextTaskId(epic.slug);
+    const slug = slugify(input.title) || "untitled";
+    const fileStem = `${id}-${slug}`;
+    const fm = validateTaskFrontmatter({
+      id,
+      title: input.title,
+      epic: epic.frontmatter.id,
+      status: "backlog",
+      depends_on: dependsOn,
+      tags: input.tags ?? [],
+      created: now,
+      updated: now,
+    });
+    const sections = {
+      "User Story": input.userStory ?? "",
+      Description: input.description ?? "",
+      "What To Do": input.whatToDo ?? "",
+      "What Is Done": "",
+      "How To Test": input.howToTest ?? "",
+      "Technical Summary": input.technicalSummary ?? "",
+      Comments: "",
+    };
+    const candidate: Ticket<TaskFrontmatter> = { frontmatter: fm, sections, slug: fileStem };
+    const cyclePath = detectCycle([...allTasks, candidate]);
+    if (cyclePath) {
+      throw new EasyprmError("DEPENDENCY_CYCLE", `Adding these dependencies would create a cycle: ${cyclePath.join(" -> ")}`, {
+        field: "depends_on",
+        details: { path: cyclePath },
+        recoverable: true,
+        next_steps: "Remove one of the dependencies in the cycle.",
+      });
+    }
+    await atomicWrite(paths().taskFile(epic.slug, fileStem), renderTask(fm, sections));
+    await regen();
+    return { frontmatter: fm, sections, slug: fileStem };
   }
 
   const id = await nextTaskId(epic.slug);
@@ -178,7 +216,8 @@ export async function updateTask(taskId: string, patch: UpdateTaskInput, now: st
         next_steps: "Remove the task's own id from depends_on.",
       });
     }
-    const existing = new Set((await loadAllTasks()).map((t) => t.frontmatter.id));
+    const allTasks = await loadAllTasks();
+    const existing = new Set(allTasks.map((t) => t.frontmatter.id));
     const missing = patch.dependsOn.filter((d) => !existing.has(d));
     if (missing.length) {
       throw new EasyprmError("DEPENDENCY_INVALID", `Unknown dependencies: ${missing.join(", ")}`, {
@@ -187,13 +226,36 @@ export async function updateTask(taskId: string, patch: UpdateTaskInput, now: st
         next_steps: "Reference existing task ids only.",
       });
     }
+
+    const fm = validateTaskFrontmatter({
+      ...current.frontmatter,
+      ...(patch.status ? { status: patch.status } : {}),
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      depends_on: patch.dependsOn,
+      ...(patch.tags ? { tags: patch.tags } : {}),
+      updated: now,
+    });
+    const prospective = allTasks.map((t) =>
+      t.frontmatter.id === fm.id ? { frontmatter: fm, sections: mergedSections, slug: loc.fileStem } : t
+    );
+    const cyclePath = detectCycle(prospective);
+    if (cyclePath) {
+      throw new EasyprmError("DEPENDENCY_CYCLE", `These dependencies would create a cycle: ${cyclePath.join(" -> ")}`, {
+        field: "depends_on",
+        details: { path: cyclePath },
+        recoverable: true,
+        next_steps: "Remove one of the dependencies in the cycle.",
+      });
+    }
+    await atomicWrite(paths().taskFile(loc.epicSlug, loc.fileStem), renderTask(fm, mergedSections));
+    await regen();
+    return { frontmatter: fm, sections: mergedSections, slug: loc.fileStem };
   }
 
   const fm = validateTaskFrontmatter({
     ...current.frontmatter,
     ...(patch.status ? { status: patch.status } : {}),
     ...(patch.title !== undefined ? { title: patch.title } : {}),
-    ...(patch.dependsOn ? { depends_on: patch.dependsOn } : {}),
     ...(patch.tags ? { tags: patch.tags } : {}),
     updated: now,
   });

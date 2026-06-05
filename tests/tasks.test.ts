@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { initProject } from "../src/store/project.js";
 import { createEpic } from "../src/store/epics.js";
-import { createTask, getTask, listTasks, loadAllTasks } from "../src/store/tasks.js";
+import { createTask, getTask, listTasks, loadAllTasks, updateTask } from "../src/store/tasks.js";
 
 let root: string;
 beforeEach(async () => {
@@ -50,5 +50,15 @@ describe("tasks store: create/read/list", () => {
     expect((await listTasks({ epic: "E1" })).length).toBe(2);
     expect((await listTasks({ tag: "ui" })).length).toBe(1);
     expect((await loadAllTasks()).length).toBe(2);
+  });
+
+  it("rejects a dependency that would create a cycle on create", async () => {
+    await createTask({ epic: "E1", title: "A" }, "2026-06-05"); // E1-T1
+    await updateTask("E1-T1", { dependsOn: [] }, "2026-06-05"); // ensure exists
+    await createTask({ epic: "E1", title: "B", dependsOn: ["E1-T1"] }, "2026-06-05"); // E1-T2 -> E1-T1
+    // now make E1-T1 depend on E1-T2 => cycle
+    await expect(
+      updateTask("E1-T1", { dependsOn: ["E1-T2"] }, "2026-06-05"),
+    ).rejects.toMatchObject({ code: "DEPENDENCY_CYCLE" });
   });
 });
