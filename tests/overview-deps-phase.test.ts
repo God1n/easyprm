@@ -30,6 +30,13 @@ describe("dependencies.md per-phase clustering", () => {
     const md = readFileSync(depsPath(), "utf8");
     expect(md).toMatch(/subgraph P1/);
     expect(md).toMatch(/subgraph P2/);
+    expect(md).toMatch(/subgraph P1 \["P1: MVP"\]/);
+    const p1Block = md.match(/subgraph P1[\s\S]*?\n  end/)?.[0] ?? "";
+    expect(p1Block).toContain("E1_T1");
+    expect(p1Block).not.toContain("E2_T1");
+    const p2Block = md.match(/subgraph P2[\s\S]*?\n  end/)?.[0] ?? "";
+    expect(p2Block).toContain("E2_T1");
+    expect(p2Block).not.toContain("E1_T1");
   });
 
   it("v0.1 trees with no phases get the existing flat output (no subgraphs)", async () => {

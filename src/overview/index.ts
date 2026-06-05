@@ -31,7 +31,7 @@ export async function regenerateOverview(): Promise<string[]> {
 
   const files: Record<string, string> = {
     "kanban.md": renderKanban(epics, tasks, activePhaseId, allPhasesShort),
-    "dependencies.md": renderDependencies(tasks, epics),
+    "dependencies.md": renderDependencies(tasks, epics, phases),
     "architecture.md": renderArchitecture(trf),
     "status.md": renderStatus(epics, tasks, decisions, activePhaseForStatus),
   };
