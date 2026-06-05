@@ -34,7 +34,7 @@ describe("auto-regeneration", () => {
   it("regenerates all four files on an empty project without throwing", async () => {
     const { regenerateOverview } = await import("../src/overview/index.js");
     const files = await regenerateOverview();
-    expect(files.sort()).toEqual(["architecture.md", "dependencies.md", "kanban.md", "status.md"]);
+    expect(files.sort()).toEqual(["architecture.md", "dependencies.md", "kanban.md", "phases.md", "status.md"]);
     for (const f of ["kanban.md", "dependencies.md", "architecture.md", "status.md"]) {
       expect(existsSync(ov(f))).toBe(true);
     }
