@@ -65,13 +65,15 @@ export async function readEpic(slugOrId: string): Promise<Ticket<EpicFrontmatter
   return loadEpic(slug);
 }
 
-export async function listEpics(): Promise<Ticket<EpicFrontmatter>[]> {
+export async function listEpics(filter: { phase?: string } = {}): Promise<Ticket<EpicFrontmatter>[]> {
   const folders = await epicFolders();
   const out: Ticket<EpicFrontmatter>[] = [];
   for (const slug of folders) {
     if (await exists(paths().epicFile(slug))) out.push(await loadEpic(slug));
   }
-  return out.sort((a, b) => a.frontmatter.id.localeCompare(b.frontmatter.id, undefined, { numeric: true }));
+  let all = out.sort((a, b) => a.frontmatter.id.localeCompare(b.frontmatter.id, undefined, { numeric: true }));
+  if (filter.phase) all = all.filter((e) => e.frontmatter.phase === filter.phase);
+  return all;
 }
 
 export interface UpdateEpicInput {
