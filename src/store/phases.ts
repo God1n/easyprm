@@ -147,6 +147,10 @@ export async function setActivePhase(id: string, now: string): Promise<Phase> {
     });
   }
   const prevId = await getActivePhase();
+  // Two-step: demote previous active, then promote target, then update project.md.
+  // If a middle step throws, project.md may still point to the previous (now demoted)
+  // id — an inconsistent but self-healing state: a retry sees prev.status === "planning",
+  // skips re-demotion, and proceeds to promote the target.
   if (prevId && prevId !== id) {
     try {
       const prev = await readPhase(prevId);
@@ -159,7 +163,6 @@ export async function setActivePhase(id: string, now: string): Promise<Phase> {
   }
   const promoted = await updatePhase(id, { status: "active" }, now);
   await setActivePhaseField(id);
-  await regen();
   return promoted;
 }
 

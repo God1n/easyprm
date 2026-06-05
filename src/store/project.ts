@@ -39,7 +39,7 @@ api -> db
 
 function projectTemplate(name: string): string {
   return `---
-name: ${name}
+name: ${JSON.stringify(name)}
 active_phase: null
 ---
 
