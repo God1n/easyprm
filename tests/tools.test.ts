@@ -72,4 +72,28 @@ describe("MCP tools", () => {
     expect(res.ok).toBe(false);
     expect(res.error.code).toBe("DOD_NOT_MET");
   });
+
+  it("add_comment appends a comment retrievable via get_task", async () => {
+    await call("init_project", { name: "Demo" });
+    await call("create_epic", { title: "Auth", goal: "g", description: "d" });
+    await call("create_task", { epic: "E1", title: "Login" });
+    const added = await call("add_comment", { id: "E1-T1", author: "AI", text: "looking into this" });
+    expect(added.ok).toBe(true);
+    const got = await call("get_task", { id: "E1-T1" });
+    expect(got.data.sections["Comments"]).toContain("(AI): looking into this");
+  });
+
+  it("write_doc to trf.md refreshes the architecture overview", async () => {
+    await call("init_project", { name: "Demo" });
+    const res = await call("write_doc", {
+      name: "trf.md",
+      content: "# Technical Requirements\n\n```easyprm:components\nweb\napi\nweb -> api\n```\n",
+    });
+    expect(res.ok).toBe(true);
+    // architecture.md is derived; read it via the filesystem
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const arch = readFileSync(path.join(process.env.EASYPRM_ROOT!, ".claude/easyprm/overview/architecture.md"), "utf8");
+    expect(arch).toContain("web --> api");
+  });
 });

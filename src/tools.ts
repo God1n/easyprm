@@ -1,8 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
+import { statusSchema } from "./schema.js";
 import { today } from "./clock.js";
-import { initProject, projectExists, readProject } from "./store/project.js";
+import { initProject, projectExists } from "./store/project.js";
 import { listDocs, readDoc, writeDoc } from "./store/docs.js";
 import { createEpic, updateEpic, listEpics } from "./store/epics.js";
 import { createTask, getTask, listTasks, updateTask, addComment, loadAllTasks } from "./store/tasks.js";
@@ -22,7 +23,9 @@ async function run(handler: Handler) {
     payload =
       e instanceof EasyprmError
         ? e.toResponse()
-        : new EasyprmError("FILE_CONFLICT", (e as Error).message).toResponse();
+        : new EasyprmError("INTERNAL_ERROR", `Unexpected error: ${(e as Error).message ?? String(e)}`, {
+            recoverable: false,
+          }).toResponse();
   }
   return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
 }
@@ -92,7 +95,7 @@ export function registerTools(server: McpServer): void {
     "write_doc",
     {
       title: "Write doc",
-      description: "Create or update a project doc (e.g. db.md). Updates architecture if trf.md changes.",
+      description: "Create or update a project doc (e.g. db.md). Regenerates all overview files (trf.md changes refresh the architecture diagram).",
       inputSchema: { name: z.string(), content: z.string() },
     },
     async ({ name, content }) =>
@@ -133,7 +136,7 @@ export function registerTools(server: McpServer): void {
       description: "Update an epic's status/goal/title/description.",
       inputSchema: {
         id: z.string(),
-        status: z.enum(["backlog", "todo", "in_progress", "blocked", "in_review", "done"]).optional(),
+        status: statusSchema.optional(),
         goal: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional(),
@@ -222,11 +225,13 @@ export function registerTools(server: McpServer): void {
       description: "Update a task's status, title, deps, tags, or sections. Blocks → done until How To Test boxes are checked.",
       inputSchema: {
         id: z.string(),
-        status: z.enum(["backlog", "todo", "in_progress", "blocked", "in_review", "done"]).optional(),
+        status: statusSchema.optional(),
         title: z.string().optional(),
         dependsOn: z.array(z.string()).optional(),
         tags: z.array(z.string()).optional(),
-        sections: z.record(z.string()).optional(),
+        sections: z.record(z.string()).optional().describe(
+          "Section bodies to overwrite. Valid keys: User Story | Description | What To Do | What Is Done | How To Test | Technical Summary | Comments. Unknown keys are ignored."
+        ),
       },
     },
     async ({ id, sections, ...rest }) =>

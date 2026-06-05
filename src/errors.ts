@@ -8,7 +8,8 @@ export type ErrorCode =
   | "DEPENDENCY_CYCLE"
   | "DOD_NOT_MET"
   | "ID_CONFLICT"
-  | "FILE_CONFLICT";
+  | "FILE_CONFLICT"
+  | "INTERNAL_ERROR";
 
 export interface ErrorOpts {
   field?: string;
