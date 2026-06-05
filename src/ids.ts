@@ -32,6 +32,17 @@ export async function nextDecisionId(): Promise<string> {
   return String(max + 1).padStart(4, "0");
 }
 
+/** Next phase id, formatted "P<n>". */
+export async function nextPhaseId(): Promise<string> {
+  const entries = await safeReaddir(paths().phasesDir);
+  let max = 0;
+  for (const name of entries) {
+    const m = /^P(\d+)-/.exec(name);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `P${max + 1}`;
+}
+
 /** Next task id within an epic, formatted "<epicId>-T<n>". */
 export async function nextTaskId(epicFolder: string): Promise<string> {
   const epicId = /^(E\d+)-/.exec(epicFolder)?.[1];

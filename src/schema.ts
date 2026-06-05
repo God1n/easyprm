@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { STATUSES, DECISION_STATUSES } from "./types.js";
-import type { TaskFrontmatter, EpicFrontmatter, DecisionFrontmatter } from "./types.js";
+import { STATUSES, DECISION_STATUSES, PHASE_STATUSES } from "./types.js";
+import type { TaskFrontmatter, EpicFrontmatter, DecisionFrontmatter, PhaseFrontmatter } from "./types.js";
 import { EasyprmError } from "./errors.js";
 
 export const statusSchema = z.enum([...STATUSES]);
@@ -14,6 +14,7 @@ export const taskFrontmatterSchema = z.object({
   tags: z.array(z.string()).default([]),
   created: z.string(),
   updated: z.string(),
+  phase: z.string().regex(/^P\d+$/).optional(),
 });
 
 export const epicFrontmatterSchema = z.object({
@@ -23,6 +24,7 @@ export const epicFrontmatterSchema = z.object({
   goal: z.string().default(""),
   created: z.string(),
   updated: z.string(),
+  phase: z.string().regex(/^P\d+$/).optional(),
 });
 
 function runOrThrow<T>(schema: z.ZodType<T>, input: unknown, what: string): T {
@@ -60,6 +62,21 @@ export const decisionFrontmatterSchema = z.object({
 
 export function validateDecisionFrontmatter(input: unknown): DecisionFrontmatter {
   return runOrThrow(decisionFrontmatterSchema, input, "decision frontmatter") as DecisionFrontmatter;
+}
+
+export const phaseStatusSchema = z.enum([...PHASE_STATUSES]);
+
+export const phaseFrontmatterSchema = z.object({
+  id: z.string().regex(/^P\d+$/),
+  title: z.string().min(1),
+  status: phaseStatusSchema,
+  goal: z.string().default(""),
+  created: z.string(),
+  updated: z.string(),
+});
+
+export function validatePhaseFrontmatter(input: unknown): PhaseFrontmatter {
+  return runOrThrow(phaseFrontmatterSchema, input, "phase frontmatter") as PhaseFrontmatter;
 }
 
 export function slugify(s: string): string {

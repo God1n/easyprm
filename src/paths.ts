@@ -15,6 +15,8 @@ export interface Paths {
   docFile: (name: string) => string;
   decisionsDir: string;
   decisionFile: (fileStem: string) => string;
+  phasesDir: string;
+  phaseFile: (slug: string) => string;
 }
 
 export function paths(): Paths {
@@ -22,6 +24,7 @@ export function paths(): Paths {
   const base = path.join(root, ".claude", "easyprm");
   const epics = path.join(base, "epics");
   const decisions = path.join(base, "decisions");
+  const phases = path.join(base, "phases");
   return {
     root,
     base,
@@ -37,5 +40,7 @@ export function paths(): Paths {
     docFile: (name) => path.join(base, "docs", name),
     decisionsDir: decisions,
     decisionFile: (stem) => path.join(decisions, `${stem}.md`),
+    phasesDir: phases,
+    phaseFile: (slug) => path.join(phases, `${slug}.md`),
   };
 }

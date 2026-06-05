@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
+import matter from "gray-matter";
 import { paths } from "../paths.js";
-import { ensureDir, writeIfAbsent, readFileUtf8 } from "./fsutil.js";
+import { ensureDir, writeIfAbsent, readFileUtf8, atomicWrite } from "./fsutil.js";
 
 const DEFAULT_DOCS: Record<string, string> = {
   "big-picture.md": `# Big Picture
@@ -37,7 +38,12 @@ api -> db
 };
 
 function projectTemplate(name: string): string {
-  return `# ${name}
+  return `---
+name: ${name}
+active_phase: null
+---
+
+# ${name}
 
 **Status:** planning
 
@@ -51,6 +57,7 @@ function projectTemplate(name: string): string {
 - [Dependencies](overview/dependencies.md)
 - [Architecture](overview/architecture.md)
 - [Status](overview/status.md)
+- [Phases](phases.md)
 `;
 }
 
@@ -74,4 +81,19 @@ export async function initProject(name: string): Promise<{ created: string[] }> 
 
 export async function readProject(): Promise<string> {
   return readFileUtf8(paths().projectFile);
+}
+
+export async function getActivePhase(): Promise<string | null> {
+  const raw = await readFileUtf8(paths().projectFile);
+  const m = matter(raw);
+  const v = m.data.active_phase;
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+export async function setActivePhaseField(phaseId: string | null): Promise<void> {
+  const raw = await readFileUtf8(paths().projectFile);
+  const m = matter(raw);
+  const data = { ...m.data, active_phase: phaseId };
+  const updated = matter.stringify(m.content, data);
+  await atomicWrite(paths().projectFile, updated);
 }
