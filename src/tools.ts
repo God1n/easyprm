@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
+import { listPlaybooks, getPlaybook } from "./playbookStore.js";
 import { statusSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
@@ -279,5 +280,33 @@ export function registerTools(server: McpServer): void {
       inputSchema: {},
     },
     async () => run(async () => { requireInit(); const files = await regenerateOverview(); return ok({ regenerated: files }, "Overview is back in sync."); }),
+  );
+
+  server.registerTool(
+    "list_playbooks",
+    {
+      title: "List playbooks",
+      description: "List all bundled PM playbooks (project-setup, epic-decomposition, definition-of-done, …). Call this when you need PM guidance.",
+      inputSchema: {},
+    },
+    async () =>
+      run(async () => {
+        const playbooks = await listPlaybooks();
+        return ok({ playbooks }, "Use get_playbook(name) to read one in full.");
+      }),
+  );
+
+  server.registerTool(
+    "get_playbook",
+    {
+      title: "Get playbook",
+      description: "Return the full markdown of a bundled PM playbook by name. Use list_playbooks first if you don't know the name.",
+      inputSchema: { name: z.string() },
+    },
+    async ({ name }) =>
+      run(async () => {
+        const pb = await getPlaybook(name);
+        return ok(pb, "Apply the guidance and continue. Call get_status for current state.");
+      }),
   );
 }
