@@ -42,3 +42,15 @@ export interface Ok<T> {
   data: T;
   next_steps: string;
 }
+
+export const DECISION_STATUSES = ["proposed", "accepted", "superseded"] as const;
+export type DecisionStatus = (typeof DECISION_STATUSES)[number];
+
+export interface DecisionFrontmatter {
+  id: string;             // 4-digit zero-padded, e.g. "0003"
+  title: string;
+  status: DecisionStatus;
+  epic?: string;          // optional, e.g. "E2"
+  supersedes?: string;    // optional, another decision id
+  date: string;
+}

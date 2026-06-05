@@ -21,6 +21,17 @@ export async function nextEpicId(): Promise<string> {
   return `E${max + 1}`;
 }
 
+/** Next decision id, 4-digit zero-padded (e.g. "0004"). */
+export async function nextDecisionId(): Promise<string> {
+  const entries = await safeReaddir(paths().decisionsDir);
+  let max = 0;
+  for (const name of entries) {
+    const m = /^(\d{4})-/.exec(name);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return String(max + 1).padStart(4, "0");
+}
+
 /** Next task id within an epic, formatted "<epicId>-T<n>". */
 export async function nextTaskId(epicFolder: string): Promise<string> {
   const epicId = /^(E\d+)-/.exec(epicFolder)?.[1];

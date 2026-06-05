@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { STATUSES } from "./types.js";
-import type { TaskFrontmatter, EpicFrontmatter } from "./types.js";
+import { STATUSES, DECISION_STATUSES } from "./types.js";
+import type { TaskFrontmatter, EpicFrontmatter, DecisionFrontmatter } from "./types.js";
 import { EasyprmError } from "./errors.js";
 
 export const statusSchema = z.enum([...STATUSES]);
@@ -45,6 +45,21 @@ export function validateTaskFrontmatter(input: unknown): TaskFrontmatter {
 
 export function validateEpicFrontmatter(input: unknown): EpicFrontmatter {
   return runOrThrow(epicFrontmatterSchema, input, "epic frontmatter") as EpicFrontmatter;
+}
+
+export const decisionStatusSchema = z.enum([...DECISION_STATUSES]);
+
+export const decisionFrontmatterSchema = z.object({
+  id: z.string().regex(/^\d{4}$/, "Decision id must be 4-digit zero-padded (e.g. 0003)."),
+  title: z.string().min(1),
+  status: decisionStatusSchema,
+  epic: z.string().optional(),
+  supersedes: z.string().regex(/^\d{4}$/).optional(),
+  date: z.string(),
+});
+
+export function validateDecisionFrontmatter(input: unknown): DecisionFrontmatter {
+  return runOrThrow(decisionFrontmatterSchema, input, "decision frontmatter") as DecisionFrontmatter;
 }
 
 export function slugify(s: string): string {
