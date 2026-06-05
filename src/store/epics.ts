@@ -29,7 +29,7 @@ function folderForId(id: string, folders: string[]): string | undefined {
 
 export async function createEpic(input: CreateEpicInput, now: string): Promise<Ticket<EpicFrontmatter>> {
   const id = await nextEpicId();
-  const slug = `${id}-${slugify(input.title)}`;
+  const slug = `${id}-${slugify(input.title) || "untitled"}`;
   const fm = validateEpicFrontmatter({
     id, title: input.title, status: "backlog", goal: input.goal, created: now, updated: now,
   });

@@ -59,6 +59,15 @@ describe("updateTask", () => {
     expect(t.sections["Comments"]).toContain("2026-06-06 (AI): blocked on infra");
   });
 
+  it("appends a second comment without overwriting the first", async () => {
+    await createTask({ epic: "E1", title: "A" }, "2026-06-05");
+    await addComment("E1-T1", "AI", "first comment", "2026-06-06");
+    await addComment("E1-T1", "AI", "second comment", "2026-06-07");
+    const t = await getTask("E1-T1");
+    expect(t.sections["Comments"]).toContain("2026-06-06 (AI): first comment");
+    expect(t.sections["Comments"]).toContain("2026-06-07 (AI): second comment");
+  });
+
   it("rejects updating dependencies to a cycle is handled at DAG layer, not here", async () => {
     // depends_on validation against existence only
     await createTask({ epic: "E1", title: "A" }, "2026-06-05");

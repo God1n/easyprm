@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { paths } from "../paths.js";
-import { atomicWrite, exists, readFileUtf8 } from "./fsutil.js";
+import { atomicWrite, readFileUtf8 } from "./fsutil.js";
 import { parseTicket, renderTask, parseCheckboxes } from "../frontmatter.js";
 import { validateTaskFrontmatter, slugify } from "../schema.js";
 import { nextTaskId } from "../ids.js";
@@ -72,6 +72,7 @@ export async function getTask(taskId: string): Promise<Ticket<TaskFrontmatter>> 
   return { frontmatter: validateTaskFrontmatter(parsed.frontmatter), sections: parsed.sections, slug: loc.fileStem };
 }
 
+/** epic: the epic's ID (e.g. "E1"), not the folder slug. */
 export interface ListFilter { epic?: string; status?: string; tag?: string; }
 
 export async function listTasks(filter: ListFilter = {}): Promise<Ticket<TaskFrontmatter>[]> {
@@ -98,7 +99,8 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
   }
 
   const id = await nextTaskId(epic.slug);
-  const fileStem = `${id}-${slugify(input.title)}`;
+  const slug = slugify(input.title) || "untitled";
+  const fileStem = `${id}-${slug}`;
   const fm = validateTaskFrontmatter({
     id,
     title: input.title,
@@ -122,8 +124,6 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
   return { frontmatter: fm, sections, slug: fileStem };
 }
 
-// updateTask, addComment — added below (Task 10).
-
 export interface UpdateTaskInput {
   status?: TaskFrontmatter["status"];
   title?: string;
@@ -135,10 +135,6 @@ export interface UpdateTaskInput {
   >>;
 }
 
-function unmetDodItems(howToTest: string): string[] {
-  return parseCheckboxes(howToTest).filter((c) => !c.checked).map((c) => c.text);
-}
-
 export async function updateTask(taskId: string, patch: UpdateTaskInput, now: string): Promise<Ticket<TaskFrontmatter>> {
   const loc = await locateTask(taskId);
   if (!loc) {
@@ -146,16 +142,23 @@ export async function updateTask(taskId: string, patch: UpdateTaskInput, now: st
       next_steps: "Call list_tasks to see available tasks.",
     });
   }
-  const current = await getTask(taskId);
+  const raw = await readFileUtf8(paths().taskFile(loc.epicSlug, loc.fileStem));
+  const parsed = parseTicket(raw, loc.fileStem);
+  const current: Ticket<TaskFrontmatter> = {
+    frontmatter: validateTaskFrontmatter(parsed.frontmatter),
+    sections: parsed.sections,
+    slug: loc.fileStem,
+  };
   const mergedSections = { ...current.sections, ...(patch.sections ?? {}) };
 
   // Definition-of-Done guard.
   if (patch.status === "done") {
-    const unmet = unmetDodItems(mergedSections["How To Test"] ?? "");
+    const boxes = parseCheckboxes(mergedSections["How To Test"] ?? "");
+    const unmet = boxes.filter((c) => !c.checked).map((c) => c.text);
     if (unmet.length) {
       throw new EasyprmError(
         "DOD_NOT_MET",
-        `Cannot move ${taskId} to 'done': ${unmet.length} of ${parseCheckboxes(mergedSections["How To Test"] ?? "").length} 'How To Test' items unchecked.`,
+        `Cannot move ${taskId} to 'done': ${unmet.length} of ${boxes.length} 'How To Test' items unchecked.`,
         {
           field: "status",
           details: { unchecked: unmet },
@@ -167,8 +170,15 @@ export async function updateTask(taskId: string, patch: UpdateTaskInput, now: st
 
   // Dependency existence check if depends_on changed.
   if (patch.dependsOn) {
+    if (patch.dependsOn.includes(taskId)) {
+      throw new EasyprmError("DEPENDENCY_INVALID", `A task cannot depend on itself: ${taskId}`, {
+        field: "depends_on",
+        recoverable: true,
+        next_steps: "Remove the task's own id from depends_on.",
+      });
+    }
     const existing = new Set((await loadAllTasks()).map((t) => t.frontmatter.id));
-    const missing = patch.dependsOn.filter((d) => d !== taskId && !existing.has(d));
+    const missing = patch.dependsOn.filter((d) => !existing.has(d));
     if (missing.length) {
       throw new EasyprmError("DEPENDENCY_INVALID", `Unknown dependencies: ${missing.join(", ")}`, {
         field: "depends_on",
