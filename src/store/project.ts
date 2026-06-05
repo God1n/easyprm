@@ -1,8 +1,6 @@
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
+import { existsSync } from "node:fs";
 import { paths } from "../paths.js";
-import { ensureDir, exists, writeIfAbsent, atomicWrite, readFileUtf8 } from "./fsutil.js";
+import { ensureDir, writeIfAbsent, readFileUtf8 } from "./fsutil.js";
 
 const DEFAULT_DOCS: Record<string, string> = {
   "big-picture.md": `# Big Picture
@@ -57,9 +55,7 @@ function projectTemplate(name: string): string {
 }
 
 export function projectExists(): boolean {
-  // sync-friendly check used by tools before doing work
-  const fs = require("node:fs") as typeof import("node:fs");
-  return fs.existsSync(paths().projectFile);
+  return existsSync(paths().projectFile);
 }
 
 export async function initProject(name: string): Promise<{ created: string[] }> {

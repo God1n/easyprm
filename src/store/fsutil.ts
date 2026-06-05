@@ -1,4 +1,5 @@
 import { mkdir, writeFile, rename, readFile, access } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 export async function ensureDir(dir: string): Promise<void> {
@@ -17,7 +18,8 @@ export async function exists(p: string): Promise<boolean> {
 /** Atomic write: write to a temp file then rename into place. */
 export async function atomicWrite(filePath: string, content: string): Promise<void> {
   await ensureDir(path.dirname(filePath));
-  const tmp = `${filePath}.tmp-${process.pid}`;
+  // A crash between writeFile and rename can leave a stale .tmp-* file; it is harmless and visible.
+  const tmp = `${filePath}.tmp-${randomBytes(6).toString("hex")}`;
   await writeFile(tmp, content, "utf8");
   await rename(tmp, filePath);
 }

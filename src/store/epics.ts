@@ -42,6 +42,12 @@ export async function createEpic(input: CreateEpicInput, now: string): Promise<T
   return { frontmatter: fm, sections, slug };
 }
 
+async function loadEpic(slug: string): Promise<Ticket<EpicFrontmatter>> {
+  const raw = await readFileUtf8(paths().epicFile(slug));
+  const parsed = parseTicket(raw, slug);
+  return { frontmatter: validateEpicFrontmatter(parsed.frontmatter), sections: parsed.sections, slug };
+}
+
 export async function readEpic(slugOrId: string): Promise<Ticket<EpicFrontmatter>> {
   const folders = await epicFolders();
   const slug = folders.includes(slugOrId) ? slugOrId : folderForId(slugOrId, folders);
@@ -50,16 +56,14 @@ export async function readEpic(slugOrId: string): Promise<Ticket<EpicFrontmatter
       next_steps: "Call list_epics to see available epics.",
     });
   }
-  const raw = await readFileUtf8(paths().epicFile(slug));
-  const parsed = parseTicket(raw, slug);
-  return { frontmatter: validateEpicFrontmatter(parsed.frontmatter), sections: parsed.sections, slug };
+  return loadEpic(slug);
 }
 
 export async function listEpics(): Promise<Ticket<EpicFrontmatter>[]> {
   const folders = await epicFolders();
   const out: Ticket<EpicFrontmatter>[] = [];
   for (const slug of folders) {
-    if (await exists(paths().epicFile(slug))) out.push(await readEpic(slug));
+    if (await exists(paths().epicFile(slug))) out.push(await loadEpic(slug));
   }
   return out.sort((a, b) => a.frontmatter.id.localeCompare(b.frontmatter.id, undefined, { numeric: true }));
 }
@@ -73,10 +77,11 @@ export interface UpdateEpicInput {
 }
 
 export async function updateEpic(slugOrId: string, patch: UpdateEpicInput, now: string): Promise<Ticket<EpicFrontmatter>> {
+  // slug is immutable — renaming the title does not move the folder on disk.
   const current = await readEpic(slugOrId);
   const fm = validateEpicFrontmatter({
     ...current.frontmatter,
-    ...(patch.status ? { status: patch.status } : {}),
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
     ...(patch.goal !== undefined ? { goal: patch.goal } : {}),
     ...(patch.title !== undefined ? { title: patch.title } : {}),
     updated: now,

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { initProject, projectExists } from "../src/store/project.js";
+import { initProject, projectExists, readProject } from "../src/store/project.js";
 
 let root: string;
 beforeEach(() => {
@@ -29,6 +29,12 @@ describe("initProject", () => {
     expect(existsSync(path.join(base(), "epics"))).toBe(true);
     expect(existsSync(path.join(base(), "overview"))).toBe(true);
     expect(readFileSync(path.join(base(), "project.md"), "utf8")).toContain("My App");
+  });
+
+  it("readProject returns file contents containing the project name", async () => {
+    await initProject("My App");
+    const content = await readProject();
+    expect(content).toContain("My App");
   });
 
   it("is idempotent — re-init does not overwrite an existing doc", async () => {
