@@ -18,7 +18,8 @@ describe("bundled playbooks", () => {
       expect(meta.title.length).toBeGreaterThan(0);
       expect(meta.when_to_use.length).toBeGreaterThan(0);
       const full = await getPlaybook(slug);
-      expect(full.content.length).toBeGreaterThan(400);
+      expect(full.content.length).toBeGreaterThan(800);
+      expect(full.content).toMatch(/^## /m);
     }
   });
 });

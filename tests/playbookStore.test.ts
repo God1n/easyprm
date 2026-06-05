@@ -1,24 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { listPlaybooks, getPlaybook } from "../src/playbookStore.js";
 import { EasyprmError } from "../src/errors.js";
 
-// Seed a fixture directory under src/playbooks for testing
-const PB_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "playbooks");
-const SEEDED = ["__fixture-a.md", "__fixture-b.md"];
+// Use a temp dir via env override to avoid writing fixtures into src/playbooks/
+let PB_DIR: string;
 
 beforeAll(() => {
-  mkdirSync(PB_DIR, { recursive: true });
-  writeFileSync(path.join(PB_DIR, SEEDED[0]),
+  PB_DIR = mkdtempSync(path.join(tmpdir(), "easyprm-pb-"));
+  process.env.EASYPRM_BUNDLE_PLAYBOOKS = PB_DIR;
+  writeFileSync(path.join(PB_DIR, "__fixture-a.md"),
     "---\nname: __fixture-a\ntitle: Fixture A\nwhen_to_use: Always.\n---\n\n# Body A\n");
-  writeFileSync(path.join(PB_DIR, SEEDED[1]),
+  writeFileSync(path.join(PB_DIR, "__fixture-b.md"),
     "---\nname: __fixture-b\ntitle: Fixture B\nwhen_to_use: Never.\nrelated: [__fixture-a]\n---\n\n# Body B\n");
 });
 
 afterAll(() => {
-  SEEDED.forEach((f) => rmSync(path.join(PB_DIR, f), { force: true }));
+  delete process.env.EASYPRM_BUNDLE_PLAYBOOKS;
+  rmSync(PB_DIR, { recursive: true, force: true });
 });
 
 describe("playbookStore", () => {
@@ -39,6 +40,8 @@ describe("playbookStore", () => {
     expect(pb.name).toBe("__fixture-a");
     expect(pb.title).toBe("Fixture A");
     expect(pb.content).toContain("# Body A");
+    expect(pb.content).not.toContain("---"); // YAML delimiters stripped
+    expect(pb.content).not.toMatch(/^name:/m); // structured fields not in body
   });
 
   it("getPlaybook throws PLAYBOOK_NOT_FOUND for unknown name", async () => {

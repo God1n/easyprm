@@ -24,7 +24,7 @@ async function readOne(file: string): Promise<Playbook> {
     title: data.title ?? path.basename(file, ".md"),
     when_to_use: data.when_to_use ?? "",
     related: data.related ?? [],
-    content: raw,
+    content: m.content,
   };
 }
 

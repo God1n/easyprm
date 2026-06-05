@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerTools } from "../src/tools.js";
 
 let root: string;
+let pbDir: string;
 let client: Client;
-
-const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "playbooks", "__t.md");
 
 async function call(name: string, args: Record<string, unknown> = {}) {
   const res = await client.callTool({ name, arguments: args });
@@ -21,9 +19,10 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
   root = mkdtempSync(path.join(tmpdir(), "easyprm-pb-"));
+  pbDir = mkdtempSync(path.join(tmpdir(), "easyprm-pbs-"));
   process.env.EASYPRM_ROOT = root;
-  mkdirSync(path.dirname(FIXTURE), { recursive: true });
-  writeFileSync(FIXTURE, "---\nname: __t\ntitle: T\nwhen_to_use: x.\n---\n\nBODY\n");
+  process.env.EASYPRM_BUNDLE_PLAYBOOKS = pbDir;
+  writeFileSync(path.join(pbDir, "__t.md"), "---\nname: __t\ntitle: T\nwhen_to_use: x.\n---\n\nBODY\n");
   const server = new McpServer({ name: "easyprm", version: "0.2.0" });
   registerTools(server);
   client = new Client({ name: "t", version: "0" });
@@ -34,8 +33,9 @@ beforeEach(async () => {
 afterEach(async () => {
   await client.close();
   delete process.env.EASYPRM_ROOT;
-  rmSync(FIXTURE, { force: true });
+  delete process.env.EASYPRM_BUNDLE_PLAYBOOKS;
   rmSync(root, { recursive: true, force: true });
+  rmSync(pbDir, { recursive: true, force: true });
 });
 
 describe("playbook tools", () => {
