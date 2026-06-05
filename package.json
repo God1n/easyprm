@@ -6,7 +6,7 @@
   "bin": { "easyprm": "dist/index.js" },
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-playbooks.cjs",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
