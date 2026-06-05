@@ -11,7 +11,8 @@ export type ErrorCode =
   | "FILE_CONFLICT"
   | "INTERNAL_ERROR"
   | "PLAYBOOK_NOT_FOUND"
-  | "DECISION_NOT_FOUND";
+  | "DECISION_NOT_FOUND"
+  | "PHASE_NOT_FOUND";
 
 export interface ErrorOpts {
   field?: string;
