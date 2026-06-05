@@ -14,6 +14,7 @@ import { getNextTask } from "./dag.js";
 import { regenerateOverview } from "./overview/index.js";
 import { paths } from "./paths.js";
 import { readFileUtf8, exists } from "./store/fsutil.js";
+import { buildBriefing } from "./briefing.js";
 
 type Handler = () => Promise<unknown>;
 
@@ -452,4 +453,17 @@ export function registerTools(server: McpServer): void {
     }),
   );
 
+  server.registerTool(
+    "get_briefing",
+    {
+      title: "Get briefing",
+      description: "Single-call snapshot of project state: active phase, in-progress and blocked tasks, recommended next, latest ADRs, recent comments. Call at session start.",
+      inputSchema: {},
+    },
+    async () => run(async () => {
+      requireInit();
+      const briefing = await buildBriefing();
+      return ok(briefing, "You're caught up. Continue with the recommended next task, or call get_playbook for guidance.");
+    }),
+  );
 }
