@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { initProject } from "../src/store/project.js";
 import { createDecision, listDecisions, updateDecision, readDecision } from "../src/store/decisions.js";
+import { paths } from "../src/paths.js";
 
 let root: string;
 beforeEach(async () => {
@@ -46,5 +47,13 @@ describe("decisions store", () => {
     await createDecision({ title: "A", epic: "E1", context: "x", decision: "x", consequences: "x" }, "2026-06-06");
     await createDecision({ title: "B", epic: "E2", context: "x", decision: "x", consequences: "x" }, "2026-06-06");
     expect((await listDecisions({ epic: "E1" })).length).toBe(1);
+  });
+
+  it("listDecisions skips a corrupt decision file without throwing", async () => {
+    await createDecision({ title: "Good", context: "x", decision: "x", consequences: "x" }, "2026-06-06");
+    // write a deliberately corrupt ADR file alongside the good one
+    writeFileSync(`${paths().decisionsDir}/0099-bad.md`, "this has no frontmatter and is unparseable");
+    const list = await listDecisions();
+    expect(list.map((d) => d.frontmatter.id)).toEqual(["0001"]); // the good one survives
   });
 });

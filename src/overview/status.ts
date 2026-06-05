@@ -21,7 +21,7 @@ export function renderStatus(
     .sort((a, b) => b.frontmatter.id.localeCompare(a.frontmatter.id))
     .slice(0, 3);
   const dBlock = latestDecisions.length
-    ? `\n**Recent decisions:**\n${latestDecisions.map((d) => `- ${d.frontmatter.id} ${d.frontmatter.title} (${d.frontmatter.status})`).join("\n")}\n`
+    ? `\n\n**Recent decisions:**\n${latestDecisions.map((d) => `- ${d.frontmatter.id} ${d.frontmatter.title} (${d.frontmatter.status})`).join("\n")}\n`
     : "";
 
   return `${BANNER}

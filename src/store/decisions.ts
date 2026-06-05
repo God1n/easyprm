@@ -59,11 +59,19 @@ function fileForId(id: string, files: string[]): string | undefined {
 }
 
 async function loadDecision(stem: string): Promise<Decision> {
-  const raw = await readFileUtf8(paths().decisionFile(stem));
-  const m = matter(raw);
-  const fm = validateDecisionFrontmatter(m.data);
-  const sections = splitSections(m.content) as DecisionSections;
-  return { frontmatter: fm, sections, slug: stem };
+  try {
+    const raw = await readFileUtf8(paths().decisionFile(stem));
+    const m = matter(raw);
+    const fm = validateDecisionFrontmatter(m.data);
+    const sections = splitSections(m.content) as DecisionSections;
+    return { frontmatter: fm, sections, slug: stem };
+  } catch (e) {
+    const msg = (e instanceof Error) ? e.message : String(e);
+    throw new EasyprmError("FILE_CONFLICT", `Cannot read decision file: ${msg}`, {
+      details: { slug: stem },
+      next_steps: "Fix the YAML frontmatter in this decision file.",
+    });
+  }
 }
 
 export async function readDecision(id: string): Promise<Decision> {
@@ -80,7 +88,14 @@ export async function readDecision(id: string): Promise<Decision> {
 export async function listDecisions(filter: { epic?: string; status?: DecisionStatus } = {}): Promise<Decision[]> {
   const files = await decisionFiles();
   const all: Decision[] = [];
-  for (const f of files) all.push(await loadDecision(f.replace(/\.md$/, "")));
+  for (const f of files) {
+    const stem = f.replace(/\.md$/, "");
+    try {
+      all.push(await loadDecision(stem));
+    } catch (err) {
+      console.warn(`[easyprm] skipping unreadable decision file: ${stem} - ${(err instanceof Error) ? err.message : String(err)}`);
+    }
+  }
   let out = all.sort((a, b) => a.frontmatter.id.localeCompare(b.frontmatter.id));
   if (filter.epic) out = out.filter((d) => d.frontmatter.epic === filter.epic);
   if (filter.status) out = out.filter((d) => d.frontmatter.status === filter.status);

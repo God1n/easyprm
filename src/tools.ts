@@ -3,7 +3,7 @@ import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
 import { listPlaybooks, getPlaybook } from "./playbookStore.js";
 import { createDecision, listDecisions, updateDecision } from "./store/decisions.js";
-import { statusSchema } from "./schema.js";
+import { statusSchema, decisionStatusSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
 import { listDocs, readDoc, writeDoc } from "./store/docs.js";
@@ -318,7 +318,7 @@ export function registerTools(server: McpServer): void {
       description: "Record a lightweight architectural decision (Context, Decision, Consequences). Call after any non-obvious technical choice.",
       inputSchema: {
         title: z.string(),
-        status: z.enum(["proposed", "accepted", "superseded"]).optional(),
+        status: decisionStatusSchema.optional(),
         epic: z.string().optional(),
         supersedes: z.string().regex(/^\d{4}$/).optional(),
         context: z.string(),
@@ -338,7 +338,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "List ADRs",
       description: "List ADRs, optionally filtered by epic or status.",
-      inputSchema: { epic: z.string().optional(), status: z.enum(["proposed", "accepted", "superseded"]).optional() },
+      inputSchema: { epic: z.string().optional(), status: decisionStatusSchema.optional() },
     },
     async (f) => run(async () => {
       requireInit();
@@ -357,7 +357,7 @@ export function registerTools(server: McpServer): void {
       description: "Update an ADR's status/title/content. Use status='superseded' with supersedes=<new-id> to retire one.",
       inputSchema: {
         id: z.string().regex(/^\d{4}$/),
-        status: z.enum(["proposed", "accepted", "superseded"]).optional(),
+        status: decisionStatusSchema.optional(),
         title: z.string().optional(),
         epic: z.string().optional(),
         supersedes: z.string().regex(/^\d{4}$/).optional(),

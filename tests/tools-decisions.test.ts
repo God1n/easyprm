@@ -50,4 +50,13 @@ describe("ADR tools", () => {
     const r = await call("update_decision", { id: "0001", status: "superseded" });
     expect(r.data.status).toBe("superseded");
   });
+
+  it("list_decisions forwards epic filter to the store", async () => {
+    await call("init_project", { name: "Demo" });
+    await call("add_decision", { title: "A", epic: "E1", context: "c", decision: "d", consequences: "x" });
+    await call("add_decision", { title: "B", epic: "E2", context: "c", decision: "d", consequences: "x" });
+    const r = await call("list_decisions", { epic: "E1" });
+    expect(r.ok).toBe(true);
+    expect(r.data.decisions.map((d: { title: string }) => d.title)).toEqual(["A"]);
+  });
 });
