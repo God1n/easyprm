@@ -30,4 +30,13 @@ describe("auto-regeneration", () => {
     expect(readFileSync(ov("kanban.md"), "utf8")).toContain("E1-T1");
     expect(readFileSync(ov("status.md"), "utf8")).toContain("E1");
   });
+
+  it("regenerates all four files on an empty project without throwing", async () => {
+    const { regenerateOverview } = await import("../src/overview/index.js");
+    const files = await regenerateOverview();
+    expect(files.sort()).toEqual(["architecture.md", "dependencies.md", "kanban.md", "status.md"]);
+    for (const f of ["kanban.md", "dependencies.md", "architecture.md", "status.md"]) {
+      expect(existsSync(ov(f))).toBe(true);
+    }
+  });
 });

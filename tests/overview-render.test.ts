@@ -43,4 +43,12 @@ describe("renderDependencies", () => {
     ]);
     expect(md).toMatch(/cycle/i);
   });
+
+  it("escapes double-quotes in task titles so the mermaid block stays valid", () => {
+    const t = task("E1-T1", "todo");
+    t.frontmatter.title = 'Add "Bearer" support';
+    const md = renderDependencies([t]);
+    expect(md).not.toContain('"Bearer"');
+    expect(md).toContain("#quot;Bearer#quot;");
+  });
 });

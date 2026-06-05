@@ -23,8 +23,20 @@ function epic(id: string, status: EpicFrontmatter["status"]): Ticket<EpicFrontma
 describe("architecture", () => {
   it("parses the components block into nodes and edges", () => {
     const parsed = parseComponentsBlock(TRF);
-    expect(parsed.nodes).toEqual(["api", "db"]);
-    expect(parsed.edges).toEqual([{ from: "api", to: "db" }]);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.nodes).toEqual(["api", "db"]);
+    expect(parsed!.edges).toEqual([{ from: "api", to: "db" }]);
+  });
+
+  it("splits chained arrows into multiple edges", () => {
+    const trf = "```easyprm:components\napi -> db -> cache\n```";
+    const parsed = parseComponentsBlock(trf);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.nodes.sort()).toEqual(["api", "cache", "db"]);
+    expect(parsed!.edges).toEqual([
+      { from: "api", to: "db" },
+      { from: "db", to: "cache" },
+    ]);
   });
 
   it("renders a mermaid graph, with a hint when the block is missing", () => {

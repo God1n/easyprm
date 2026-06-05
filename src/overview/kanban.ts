@@ -18,10 +18,9 @@ export function renderKanban(
   const byStatus = (s: Status) => tasks.filter((t) => t.frontmatter.status === s);
 
   const board = STATUSES.map((s) => {
-    const items = byStatus(s)
-      .map((t) => `- ${t.frontmatter.id} ${t.frontmatter.title}`)
-      .join("\n");
-    return `### ${LABELS[s]} (${byStatus(s).length})\n\n${items || "_none_"}`;
+    const tasksForStatus = byStatus(s);
+    const items = tasksForStatus.map((t) => `- ${t.frontmatter.id} ${t.frontmatter.title}`).join("\n");
+    return `### ${LABELS[s]} (${tasksForStatus.length})\n\n${items || "_none_"}`;
   }).join("\n\n");
 
   const summary = epics
