@@ -2028,8 +2028,8 @@ describe("renderDependencies", () => {
     const md = renderDependencies([task("E1-T1", "done"), task("E1-T2", "todo", ["E1-T1"])]);
     expect(md).toContain("```mermaid");
     expect(md).toContain("graph LR");
-    expect(md).toContain("E1-T1");
-    expect(md).toContain("E1-T1 --> E1-T2");
+    expect(md).toContain("E1-T1"); // human-readable id in the node label
+    expect(md).toContain("E1_T1 --> E1_T2"); // edges use sanitized (underscore) node ids
   });
 
   it("notes when a dependency cycle is present", () => {
