@@ -25,9 +25,11 @@ export function renderDependencies(tasks: Ticket<TaskFrontmatter>[]): string {
   }
   for (const t of tasks) {
     for (const dep of t.frontmatter.depends_on) {
-      // Emit edge using original IDs (with hyphens) so the text is human-readable
-      // and tests can match "E1-T1 --> E1-T2" patterns.
-      lines.push(`  ${dep} --> ${t.frontmatter.id}`);
+      // Edges must use the SAME sanitized node ids as the node declarations
+      // above, or Mermaid treats `E1-T1` and `E1_T1` as different nodes and
+      // renders disconnected, unstyled duplicates. Human-readable ids live in
+      // the node labels.
+      lines.push(`  ${nodeId(dep)} --> ${nodeId(t.frontmatter.id)}`);
     }
   }
 
