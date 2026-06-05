@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
 import { listPlaybooks, getPlaybook } from "./playbookStore.js";
+import { createDecision, listDecisions, updateDecision } from "./store/decisions.js";
 import { statusSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
@@ -308,5 +309,67 @@ export function registerTools(server: McpServer): void {
         const pb = await getPlaybook(name);
         return ok(pb, "Apply the guidance and continue. Call get_status for current state.");
       }),
+  );
+
+  server.registerTool(
+    "add_decision",
+    {
+      title: "Add ADR",
+      description: "Record a lightweight architectural decision (Context, Decision, Consequences). Call after any non-obvious technical choice.",
+      inputSchema: {
+        title: z.string(),
+        status: z.enum(["proposed", "accepted", "superseded"]).optional(),
+        epic: z.string().optional(),
+        supersedes: z.string().regex(/^\d{4}$/).optional(),
+        context: z.string(),
+        decision: z.string(),
+        consequences: z.string(),
+      },
+    },
+    async (a) => run(async () => {
+      requireInit();
+      const d = await createDecision(a, today());
+      return ok({ id: d.frontmatter.id, slug: d.slug }, "ADR recorded. Reference its id in tickets if relevant.");
+    }),
+  );
+
+  server.registerTool(
+    "list_decisions",
+    {
+      title: "List ADRs",
+      description: "List ADRs, optionally filtered by epic or status.",
+      inputSchema: { epic: z.string().optional(), status: z.enum(["proposed", "accepted", "superseded"]).optional() },
+    },
+    async (f) => run(async () => {
+      requireInit();
+      const list = await listDecisions(f);
+      return ok(
+        { decisions: list.map((d) => ({ id: d.frontmatter.id, title: d.frontmatter.title, status: d.frontmatter.status, date: d.frontmatter.date, epic: d.frontmatter.epic })) },
+        "Use update_decision to change status or supersede.",
+      );
+    }),
+  );
+
+  server.registerTool(
+    "update_decision",
+    {
+      title: "Update ADR",
+      description: "Update an ADR's status/title/content. Use status='superseded' with supersedes=<new-id> to retire one.",
+      inputSchema: {
+        id: z.string().regex(/^\d{4}$/),
+        status: z.enum(["proposed", "accepted", "superseded"]).optional(),
+        title: z.string().optional(),
+        epic: z.string().optional(),
+        supersedes: z.string().regex(/^\d{4}$/).optional(),
+        context: z.string().optional(),
+        decision: z.string().optional(),
+        consequences: z.string().optional(),
+      },
+    },
+    async ({ id, ...patch }) => run(async () => {
+      requireInit();
+      const d = await updateDecision(id, patch, today());
+      return ok({ id: d.frontmatter.id, status: d.frontmatter.status }, "ADR updated.");
+    }),
   );
 }
