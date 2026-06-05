@@ -109,6 +109,7 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
       status: "backlog",
       depends_on: dependsOn,
       tags: input.tags ?? [],
+      ...(epic.frontmatter.phase ? { phase: epic.frontmatter.phase } : {}),
       created: now,
       updated: now,
     });
@@ -146,6 +147,7 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
     status: "backlog",
     depends_on: dependsOn,
     tags: input.tags ?? [],
+    ...(epic.frontmatter.phase ? { phase: epic.frontmatter.phase } : {}),
     created: now,
     updated: now,
   });
