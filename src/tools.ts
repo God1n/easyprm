@@ -3,12 +3,13 @@ import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
 import { listPlaybooks, getPlaybook } from "./playbookStore.js";
 import { createDecision, listDecisions, updateDecision } from "./store/decisions.js";
-import { statusSchema, decisionStatusSchema } from "./schema.js";
+import { statusSchema, decisionStatusSchema, phaseStatusSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
 import { listDocs, readDoc, writeDoc } from "./store/docs.js";
 import { createEpic, updateEpic, listEpics } from "./store/epics.js";
 import { createTask, getTask, listTasks, updateTask, addComment, loadAllTasks } from "./store/tasks.js";
+import { createPhase, listPhases, updatePhase, setActivePhase } from "./store/phases.js";
 import { getNextTask } from "./dag.js";
 import { regenerateOverview } from "./overview/index.js";
 import { paths } from "./paths.js";
@@ -118,6 +119,7 @@ export function registerTools(server: McpServer): void {
         goal: z.string(),
         description: z.string(),
         successCriteria: z.string().optional(),
+        phase: z.string().regex(/^P\d+$/).optional(),
       },
     },
     async (a) =>
@@ -143,6 +145,7 @@ export function registerTools(server: McpServer): void {
         title: z.string().optional(),
         description: z.string().optional(),
         successCriteria: z.string().optional(),
+        phase: z.string().regex(/^P\d+$/).optional(),
       },
     },
     async ({ id, ...patch }) =>
@@ -151,11 +154,11 @@ export function registerTools(server: McpServer): void {
 
   server.registerTool(
     "list_epics",
-    { title: "List epics", description: "List all epics with status.", inputSchema: {} },
-    async () =>
+    { title: "List epics", description: "List all epics with status.", inputSchema: { phase: z.string().regex(/^P\d+$/).optional() } },
+    async ({ phase }) =>
       run(async () => {
         requireInit();
-        const epics = await listEpics();
+        const epics = await listEpics({ phase });
         return ok(
           { epics: epics.map((e) => ({ id: e.frontmatter.id, title: e.frontmatter.title, status: e.frontmatter.status })) },
           "create_task under an epic, or get_next_task.",
@@ -206,8 +209,8 @@ export function registerTools(server: McpServer): void {
     "list_tasks",
     {
       title: "List tasks",
-      description: "List tasks, optionally filtered by epic/status/tag.",
-      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional() },
+      description: "List tasks, optionally filtered by epic/status/tag/phase.",
+      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional(), phase: z.string().regex(/^P\d+$/).optional() },
     },
     async (f) =>
       run(async () => {
@@ -249,12 +252,13 @@ export function registerTools(server: McpServer): void {
     {
       title: "Get next task",
       description: "Return the single recommended next task given dependencies and current status.",
-      inputSchema: {},
+      inputSchema: { phase: z.string().regex(/^P\d+$/).optional() },
     },
-    async () =>
+    async ({ phase }) =>
       run(async () => {
         requireInit();
-        const next = getNextTask(await loadAllTasks());
+        const tasks = phase ? await listTasks({ phase }) : await loadAllTasks();
+        const next = getNextTask(tasks);
         return ok(
           { task: next.task ? { id: next.task.frontmatter.id, title: next.task.frontmatter.title } : null, reason: next.reason },
           next.task ? `Set ${next.task.frontmatter.id} to in_progress and start.` : next.reason,
@@ -372,4 +376,80 @@ export function registerTools(server: McpServer): void {
       return ok({ id: d.frontmatter.id, status: d.frontmatter.status }, "ADR updated.");
     }),
   );
+
+  server.registerTool(
+    "create_phase",
+    {
+      title: "Create phase",
+      description: "Create a phase (sequential release). Returns its assigned P# id.",
+      inputSchema: {
+        title: z.string(),
+        goal: z.string(),
+        description: z.string(),
+        successCriteria: z.string().optional(),
+      },
+    },
+    async (a) => run(async () => {
+      requireInit();
+      const p = await createPhase(a, today());
+      return ok({ id: p.frontmatter.id, slug: p.slug }, "Decide active phase via set_active_phase, then create_epic.");
+    }),
+  );
+
+  server.registerTool(
+    "list_phases",
+    {
+      title: "List phases",
+      description: "List all phases with status and goal.",
+      inputSchema: {},
+    },
+    async () => run(async () => {
+      requireInit();
+      const phases = await listPhases();
+      return ok({
+        phases: phases.map((p) => ({
+          id: p.frontmatter.id,
+          title: p.frontmatter.title,
+          status: p.frontmatter.status,
+          goal: p.frontmatter.goal,
+        })),
+      }, "set_active_phase changes focus; create_epic lands in the active phase by default.");
+    }),
+  );
+
+  server.registerTool(
+    "update_phase",
+    {
+      title: "Update phase",
+      description: "Update a phase's title/goal/status/description.",
+      inputSchema: {
+        id: z.string().regex(/^P\d+$/),
+        status: phaseStatusSchema.optional(),
+        title: z.string().optional(),
+        goal: z.string().optional(),
+        description: z.string().optional(),
+        successCriteria: z.string().optional(),
+      },
+    },
+    async ({ id, ...patch }) => run(async () => {
+      requireInit();
+      const p = await updatePhase(id, patch, today());
+      return ok({ id: p.frontmatter.id, status: p.frontmatter.status }, "Phase updated.");
+    }),
+  );
+
+  server.registerTool(
+    "set_active_phase",
+    {
+      title: "Set active phase",
+      description: "Make a phase the active focus. Default phase for create_epic and default scope for list/next tools. Refuses shipped phases — reopen with update_phase first.",
+      inputSchema: { id: z.string().regex(/^P\d+$/) },
+    },
+    async ({ id }) => run(async () => {
+      requireInit();
+      const p = await setActivePhase(id, today());
+      return ok({ id: p.frontmatter.id, status: p.frontmatter.status }, "Subsequent create_epic and get_next_task focus on this phase.");
+    }),
+  );
+
 }
