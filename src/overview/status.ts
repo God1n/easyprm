@@ -13,12 +13,16 @@ export function renderStatus(
   const next = getNextTask(tasks);
 
   const fmt = (t: Ticket<TaskFrontmatter>) => `${t.frontmatter.id} — ${t.frontmatter.title}`;
+  const fmtEpic = (e: Ticket<EpicFrontmatter>) => `${e.frontmatter.id} ${e.frontmatter.title} (${e.frontmatter.status})`;
 
   return `${BANNER}
 
 # Status — Where Was I
 
 **Active epic:** ${activeEpic ? `${activeEpic.frontmatter.id} ${activeEpic.frontmatter.title}` : "_none in progress_"}
+
+**All epics:**
+${epics.length ? epics.map((e) => `- ${fmtEpic(e)}`).join("\n") : "_no epics yet_"}
 
 **In progress:**
 ${inProgress.length ? inProgress.map((t) => `- ${fmt(t)}`).join("\n") : "_nothing in progress_"}

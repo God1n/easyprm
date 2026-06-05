@@ -35,5 +35,11 @@ export async function readDoc(name: string): Promise<string> {
 export async function writeDoc(name: string, content: string): Promise<string> {
   const normalized = normalizeDocName(name);
   await atomicWrite(paths().docFile(normalized), content);
+  await regen();
   return normalized;
+}
+
+async function regen(): Promise<void> {
+  const { regenerateOverview } = await import("../overview/index.js");
+  await regenerateOverview();
 }

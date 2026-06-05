@@ -39,6 +39,7 @@ export async function createEpic(input: CreateEpicInput, now: string): Promise<T
   };
   await ensureDir(paths().tasksDir(slug));
   await atomicWrite(paths().epicFile(slug), renderEpic(fm, sections));
+  await regen();
   return { frontmatter: fm, sections, slug };
 }
 
@@ -92,5 +93,11 @@ export async function updateEpic(slugOrId: string, patch: UpdateEpicInput, now: 
     ...(patch.successCriteria !== undefined ? { "Success Criteria": patch.successCriteria } : {}),
   };
   await atomicWrite(paths().epicFile(current.slug), renderEpic(fm, sections));
+  await regen();
   return { frontmatter: fm, sections, slug: current.slug };
+}
+
+async function regen(): Promise<void> {
+  const { regenerateOverview } = await import("../overview/index.js");
+  await regenerateOverview();
 }

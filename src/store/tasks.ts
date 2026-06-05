@@ -121,6 +121,7 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
     Comments: "",
   };
   await atomicWrite(paths().taskFile(epic.slug, fileStem), renderTask(fm, sections));
+  await regen();
   return { frontmatter: fm, sections, slug: fileStem };
 }
 
@@ -197,6 +198,7 @@ export async function updateTask(taskId: string, patch: UpdateTaskInput, now: st
     updated: now,
   });
   await atomicWrite(paths().taskFile(loc.epicSlug, loc.fileStem), renderTask(fm, mergedSections));
+  await regen();
   return { frontmatter: fm, sections: mergedSections, slug: loc.fileStem };
 }
 
@@ -206,4 +208,9 @@ export async function addComment(taskId: string, author: string, text: string, n
   const line = `- ${now} (${author}): ${text}`;
   const updated = existing.trim() ? `${existing.trim()}\n${line}` : line;
   return updateTask(taskId, { sections: { Comments: updated } }, now);
+}
+
+async function regen(): Promise<void> {
+  const { regenerateOverview } = await import("../overview/index.js");
+  await regenerateOverview();
 }
