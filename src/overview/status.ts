@@ -8,11 +8,21 @@ export function renderStatus(
   epics: Ticket<EpicFrontmatter>[],
   tasks: Ticket<TaskFrontmatter>[],
   decisions: Decision[] = [],
+  activePhase: { id: string; title: string } | null = null,
 ): string {
   const activeEpic = epics.find((e) => e.frontmatter.status === "in_progress");
   const inProgress = tasks.filter((t) => t.frontmatter.status === "in_progress");
   const blocked = tasks.filter((t) => t.frontmatter.status === "blocked");
-  const next = getNextTask(tasks);
+
+  // Scope "Recommended next" to active phase if one is set
+  const epicById = new Map(epics.map((e) => [e.frontmatter.id, e]));
+  const scopedTasks = activePhase
+    ? tasks.filter((t) => {
+        const eff = epicById.get(t.frontmatter.epic)?.frontmatter.phase ?? t.frontmatter.phase;
+        return eff === activePhase.id;
+      })
+    : tasks;
+  const next = getNextTask(scopedTasks);
 
   const fmt = (t: Ticket<TaskFrontmatter>) => `${t.frontmatter.id} — ${t.frontmatter.title}`;
   const fmtEpic = (e: Ticket<EpicFrontmatter>) => `${e.frontmatter.id} ${e.frontmatter.title} (${e.frontmatter.status})`;
@@ -24,10 +34,14 @@ export function renderStatus(
     ? `\n\n**Recent decisions:**\n${latestDecisions.map((d) => `- ${d.frontmatter.id} ${d.frontmatter.title} (${d.frontmatter.status})`).join("\n")}\n`
     : "";
 
+  const activePhaseBlock = activePhase
+    ? `\n**Active phase:** ${activePhase.id} (${activePhase.title})\n`
+    : "";
+
   return `${BANNER}
 
 # Status — Where Was I
-
+${activePhaseBlock}
 **Active epic:** ${activeEpic ? `${activeEpic.frontmatter.id} ${activeEpic.frontmatter.title}` : "_none in progress_"}
 
 **All epics:**

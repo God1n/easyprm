@@ -14,11 +14,26 @@ const LABELS: Record<Status, string> = {
 export function renderKanban(
   epics: Ticket<EpicFrontmatter>[],
   tasks: Ticket<TaskFrontmatter>[],
+  activePhase: string | null = null,
+  allPhases: { id: string; title: string }[] = [],
 ): string {
-  const byStatus = (s: Status) => tasks.filter((t) => t.frontmatter.status === s);
+  const epicById = new Map(epics.map((e) => [e.frontmatter.id, e]));
+
+  // Compute the effective phase for a task (epic wins)
+  function effectivePhase(t: Ticket<TaskFrontmatter>): string | undefined {
+    return epicById.get(t.frontmatter.epic)?.frontmatter.phase ?? t.frontmatter.phase;
+  }
+
+  // Determine the set of tasks to show on the primary board
+  const primaryTasks = activePhase
+    ? tasks.filter((t) => effectivePhase(t) === activePhase)
+    : tasks;
+
+  const byStatus = (s: Status, taskSet: Ticket<TaskFrontmatter>[]) =>
+    taskSet.filter((t) => t.frontmatter.status === s);
 
   const board = STATUSES.map((s) => {
-    const tasksForStatus = byStatus(s);
+    const tasksForStatus = byStatus(s, primaryTasks);
     const items = tasksForStatus.map((t) => `- ${t.frontmatter.id} ${t.frontmatter.title}`).join("\n");
     return `### ${LABELS[s]} (${tasksForStatus.length})\n\n${items || "_none_"}`;
   }).join("\n\n");
@@ -32,6 +47,35 @@ export function renderKanban(
     })
     .join("\n");
 
+  let extras = "";
+
+  if (activePhase) {
+    // Other phases section
+    const otherPhases = allPhases.filter((ph) => ph.id !== activePhase);
+    if (otherPhases.length) {
+      const otherLines = otherPhases.map((ph) => {
+        const count = tasks.filter((t) => effectivePhase(t) === ph.id).length;
+        return `- **${ph.id} ${ph.title}:** ${count} task(s)`;
+      }).join("\n");
+      extras += `\n## Other phases\n\n${otherLines}\n`;
+    }
+
+    // Unscoped section (tasks with no effective phase)
+    const unscopedTasks = tasks.filter((t) => {
+      const eff = effectivePhase(t);
+      return eff === undefined || eff === null || eff === "";
+    });
+    if (unscopedTasks.length) {
+      const unscopedBoard = STATUSES.map((s) => {
+        const tasksForStatus = byStatus(s, unscopedTasks);
+        if (!tasksForStatus.length) return null;
+        const items = tasksForStatus.map((t) => `- ${t.frontmatter.id} ${t.frontmatter.title}`).join("\n");
+        return `### ${LABELS[s]} (${tasksForStatus.length})\n\n${items}`;
+      }).filter(Boolean).join("\n\n");
+      extras += `\n## Unscoped\n\n${unscopedBoard || "_none_"}\n`;
+    }
+  }
+
   return `${BANNER}
 
 # Kanban
@@ -42,6 +86,5 @@ ${summary || "_no epics yet_"}
 
 ## Board
 
-${board}
-`;
+${board}${extras}`;
 }

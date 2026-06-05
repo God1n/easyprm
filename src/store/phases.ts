@@ -163,6 +163,8 @@ export async function setActivePhase(id: string, now: string): Promise<Phase> {
   }
   const promoted = await updatePhase(id, { status: "active" }, now);
   await setActivePhaseField(id);
+  // Regen after project.md is updated so overview files reflect the new active_phase.
+  await regen();
   return promoted;
 }
 
