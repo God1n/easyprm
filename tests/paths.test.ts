@@ -23,5 +23,8 @@ describe("paths", () => {
     expect(p.taskFile("E1-auth", "E1-T1-login")).toBe(
       "/tmp/proj/.claude/easyprm/epics/E1-auth/tasks/E1-T1-login.md"
     );
+    expect(p.tasksDir("E1-auth")).toBe("/tmp/proj/.claude/easyprm/epics/E1-auth/tasks");
+    expect(p.overviewFile("kanban.md")).toBe("/tmp/proj/.claude/easyprm/overview/kanban.md");
+    expect(p.docFile("arch.md")).toBe("/tmp/proj/.claude/easyprm/docs/arch.md");
   });
 });

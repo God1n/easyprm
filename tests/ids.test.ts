@@ -36,7 +36,6 @@ describe("ids", () => {
   it("returns the next task number within an epic", async () => {
     const tasks = path.join(root, ".claude/easyprm/epics/E1-auth/tasks");
     mkdirSync(tasks, { recursive: true });
-    mkdirSync(path.join(tasks, "..", "tasks"), { recursive: true });
     // create two task files
     const { writeFileSync } = await import("node:fs");
     writeFileSync(path.join(tasks, "E1-T1-a.md"), "");

@@ -6,6 +6,7 @@ import {
   parseCheckboxes,
   TASK_SECTIONS,
 } from "../src/frontmatter.js";
+import { EasyprmError } from "../src/errors.js";
 
 const SAMPLE = `---
 id: E1-T1
@@ -68,8 +69,11 @@ describe("frontmatter", () => {
   });
 
   it("throws FILE_CONFLICT on unparseable frontmatter", () => {
-    expect(() => parseTicket("no frontmatter here", "x")).toThrowError(
-      /FILE_CONFLICT|frontmatter/i,
-    );
+    try {
+      parseTicket("no frontmatter here", "x");
+      expect.fail("Expected an error to be thrown");
+    } catch (e) {
+      expect((e as EasyprmError).code).toBe("FILE_CONFLICT");
+    }
   });
 });

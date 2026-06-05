@@ -66,7 +66,7 @@ function splitSections(body: string): Record<string, string> {
 export function parseCheckboxes(sectionBody: string): Checkbox[] {
   const out: Checkbox[] = [];
   for (const line of sectionBody.split("\n")) {
-    const m = /^\s*-\s*\[( |x|X)\]\s+(.*\S)\s*$/.exec(line);
+    const m = /^\s*-\s+\[( |x|X)\]\s+(.*\S)\s*$/.exec(line);
     if (m) out.push({ text: m[2], checked: m[1].toLowerCase() === "x" });
   }
   return out;

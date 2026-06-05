@@ -3,7 +3,7 @@ import { STATUSES } from "./types.js";
 import type { TaskFrontmatter, EpicFrontmatter } from "./types.js";
 import { EasyprmError } from "./errors.js";
 
-const statusSchema = z.enum(STATUSES as [string, ...string[]]);
+const statusSchema = z.enum([...STATUSES]);
 
 export const taskFrontmatterSchema = z.object({
   id: z.string(),

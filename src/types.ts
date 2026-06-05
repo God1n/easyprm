@@ -1,19 +1,13 @@
-export type Status =
-  | "backlog"
-  | "todo"
-  | "in_progress"
-  | "blocked"
-  | "in_review"
-  | "done";
-
-export const STATUSES: Status[] = [
+export const STATUSES = [
   "backlog",
   "todo",
   "in_progress",
   "blocked",
   "in_review",
   "done",
-];
+] as const;
+
+export type Status = (typeof STATUSES)[number];
 
 export interface TaskFrontmatter {
   id: string;
