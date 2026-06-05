@@ -5,6 +5,7 @@ import { parseTicket, renderEpic } from "../frontmatter.js";
 import { validateEpicFrontmatter, slugify } from "../schema.js";
 import { nextEpicId } from "../ids.js";
 import { EasyprmError } from "../errors.js";
+import { getActivePhase } from "./project.js";
 import type { EpicFrontmatter, Ticket, Status } from "../types.js";
 
 export interface CreateEpicInput {
@@ -12,6 +13,7 @@ export interface CreateEpicInput {
   goal: string;
   description: string;
   successCriteria?: string;
+  phase?: string;
 }
 
 async function epicFolders(): Promise<string[]> {
@@ -30,8 +32,11 @@ function folderForId(id: string, folders: string[]): string | undefined {
 export async function createEpic(input: CreateEpicInput, now: string): Promise<Ticket<EpicFrontmatter>> {
   const id = await nextEpicId();
   const slug = `${id}-${slugify(input.title) || "untitled"}`;
+  const phase = input.phase ?? (await getActivePhase()) ?? undefined;
   const fm = validateEpicFrontmatter({
-    id, title: input.title, status: "backlog", goal: input.goal, created: now, updated: now,
+    id, title: input.title, status: "backlog", goal: input.goal,
+    ...(phase ? { phase } : {}),
+    created: now, updated: now,
   });
   const sections = {
     Description: input.description,
@@ -75,6 +80,7 @@ export interface UpdateEpicInput {
   title?: string;
   description?: string;
   successCriteria?: string;
+  phase?: string;
 }
 
 export async function updateEpic(slugOrId: string, patch: UpdateEpicInput, now: string): Promise<Ticket<EpicFrontmatter>> {
@@ -85,6 +91,7 @@ export async function updateEpic(slugOrId: string, patch: UpdateEpicInput, now: 
     ...(patch.status !== undefined ? { status: patch.status } : {}),
     ...(patch.goal !== undefined ? { goal: patch.goal } : {}),
     ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.phase !== undefined ? { phase: patch.phase } : {}),
     updated: now,
   });
   const sections = {
