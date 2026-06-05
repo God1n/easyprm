@@ -55,4 +55,37 @@ describe("getNextTask", () => {
     expect(r.task).toBeNull();
     expect(r.reason).toMatch(/done|nothing/i);
   });
+
+  it("returns null with a reason for an empty task list", () => {
+    const r = getNextTask([]);
+    expect(r.task).toBeNull();
+    expect(r.reason).toBeTruthy();
+  });
+
+  it("returns the numerically lowest-id task, not the lexicographic one", () => {
+    const r = getNextTask([task("E1-T10", "todo"), task("E1-T2", "todo"), task("E1-T1", "todo")]);
+    expect(r.task?.frontmatter.id).toBe("E1-T1");
+  });
+
+  it("treats a todo whose dependency is 'blocked' as not actionable", () => {
+    const r = getNextTask([task("E1-T1", "todo", ["E1-T2"]), task("E1-T2", "blocked")]);
+    expect(r.task).toBeNull();
+  });
+
+  it("does not claim work is done when only blocked tasks remain", () => {
+    const r = getNextTask([task("E1-T1", "blocked")]);
+    expect(r.task).toBeNull();
+    expect(r.reason).not.toMatch(/done/i);
+  });
+});
+
+describe("detectCycle — additional edge cases", () => {
+  it("detects a cycle reachable only from a later start node", () => {
+    const cycle = detectCycle([
+      task("E1-T1", "todo"),
+      task("E1-T2", "todo", ["E1-T3"]),
+      task("E1-T3", "todo", ["E1-T2"]),
+    ]);
+    expect(cycle).not.toBeNull();
+  });
 });

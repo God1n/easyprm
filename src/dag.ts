@@ -8,6 +8,7 @@ export function detectCycle(tasks: T[]): string[] | null {
   const state = new Map<string, "visiting" | "done">();
   const stack: string[] = [];
 
+  // Cycles are reported regardless of task status (conservative — a cycle is a planning error even among done tasks).
   function visit(id: string): string[] | null {
     const s = state.get(id);
     if (s === "done") return null;
@@ -51,9 +52,11 @@ export function getNextTask(tasks: T[]): NextTaskResult {
     return { task: inProgress, reason: `${inProgress.frontmatter.id} is already in progress — finish it first.` };
   }
 
-  const isDone = (id: string) => byId.get(id)?.frontmatter.status === "done";
+  // A dependency counts as satisfied only when it is 'done'. Unknown dep ids
+  // (validated upstream) resolve to undefined and are therefore treated as not satisfied.
+  const depIsDone = (id: string) => byId.get(id)?.frontmatter.status === "done";
   const actionable = sorted.find(
-    (t) => t.frontmatter.status === "todo" && t.frontmatter.depends_on.every(isDone),
+    (t) => t.frontmatter.status === "todo" && t.frontmatter.depends_on.every(depIsDone),
   );
   if (actionable) {
     const deps = actionable.frontmatter.depends_on;
@@ -67,5 +70,12 @@ export function getNextTask(tasks: T[]): NextTaskResult {
   if (anyTodo) {
     return { task: null, reason: "No actionable task: all 'todo' tasks are blocked by unfinished dependencies." };
   }
-  return { task: null, reason: "Nothing to do: no tasks are in 'todo'. Move tasks out of backlog or all work is done." };
+  const allDone = sorted.length > 0 && sorted.every((t) => t.frontmatter.status === "done");
+  if (allDone) {
+    return { task: null, reason: "All tasks are done." };
+  }
+  return {
+    task: null,
+    reason: "No actionable task: no tasks are in 'todo' or 'in_progress' (remaining work is blocked, in review, or in backlog).",
+  };
 }
