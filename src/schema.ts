@@ -64,6 +64,8 @@ export function validateDecisionFrontmatter(input: unknown): DecisionFrontmatter
   return runOrThrow(decisionFrontmatterSchema, input, "decision frontmatter") as DecisionFrontmatter;
 }
 
+export const phaseIdSchema = z.string().regex(/^P\d+$/);
+
 export const phaseStatusSchema = z.enum([...PHASE_STATUSES]);
 
 export const phaseFrontmatterSchema = z.object({

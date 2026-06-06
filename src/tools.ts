@@ -3,7 +3,7 @@ import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
 import { listPlaybooks, getPlaybook } from "./playbookStore.js";
 import { createDecision, listDecisions, updateDecision } from "./store/decisions.js";
-import { statusSchema, decisionStatusSchema, phaseStatusSchema } from "./schema.js";
+import { statusSchema, decisionStatusSchema, phaseStatusSchema, phaseIdSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
 import { listDocs, readDoc, writeDoc } from "./store/docs.js";
@@ -120,7 +120,7 @@ export function registerTools(server: McpServer): void {
         goal: z.string(),
         description: z.string(),
         successCriteria: z.string().optional(),
-        phase: z.string().regex(/^P\d+$/).optional(),
+        phase: phaseIdSchema.optional(),
       },
     },
     async (a) =>
@@ -146,7 +146,7 @@ export function registerTools(server: McpServer): void {
         title: z.string().optional(),
         description: z.string().optional(),
         successCriteria: z.string().optional(),
-        phase: z.string().regex(/^P\d+$/).optional(),
+        phase: phaseIdSchema.optional(),
       },
     },
     async ({ id, ...patch }) =>
@@ -155,7 +155,7 @@ export function registerTools(server: McpServer): void {
 
   server.registerTool(
     "list_epics",
-    { title: "List epics", description: "List all epics with status.", inputSchema: { phase: z.string().regex(/^P\d+$/).optional() } },
+    { title: "List epics", description: "List all epics with status.", inputSchema: { phase: phaseIdSchema.optional() } },
     async ({ phase }) =>
       run(async () => {
         requireInit();
@@ -211,7 +211,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "List tasks",
       description: "List tasks, optionally filtered by epic/status/tag/phase.",
-      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional(), phase: z.string().regex(/^P\d+$/).optional() },
+      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional(), phase: phaseIdSchema.optional() },
     },
     async (f) =>
       run(async () => {
@@ -253,7 +253,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "Get next task",
       description: "Return the single recommended next task given dependencies and current status.",
-      inputSchema: { phase: z.string().regex(/^P\d+$/).optional() },
+      inputSchema: { phase: phaseIdSchema.optional() },
     },
     async ({ phase }) =>
       run(async () => {
@@ -424,7 +424,7 @@ export function registerTools(server: McpServer): void {
       title: "Update phase",
       description: "Update a phase's title/goal/status/description.",
       inputSchema: {
-        id: z.string().regex(/^P\d+$/),
+        id: phaseIdSchema,
         status: phaseStatusSchema.optional(),
         title: z.string().optional(),
         goal: z.string().optional(),
@@ -444,7 +444,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "Set active phase",
       description: "Make a phase the active focus. Default phase for create_epic and default scope for list/next tools. Refuses shipped phases — reopen with update_phase first.",
-      inputSchema: { id: z.string().regex(/^P\d+$/) },
+      inputSchema: { id: phaseIdSchema },
     },
     async ({ id }) => run(async () => {
       requireInit();

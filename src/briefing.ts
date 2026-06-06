@@ -1,25 +1,32 @@
+import matter from "gray-matter";
 import { readProject, getActivePhase } from "./store/project.js";
 import { listPhases } from "./store/phases.js";
-import { loadAllTasks, listTasks } from "./store/tasks.js";
+import { loadAllTasks } from "./store/tasks.js";
+import { listEpics } from "./store/epics.js";
 import { listDecisions } from "./store/decisions.js";
 import { getNextTask } from "./dag.js";
 import { parseCheckboxes } from "./frontmatter.js";
+import { effectivePhaseOf } from "./overview/utils.js";
 
 export async function buildBriefing(): Promise<unknown> {
   const projectRaw = await readProject();
   // Extract project name from YAML frontmatter first, fallback to H1
-  const fmMatch = projectRaw.match(/^---\s*\nname:\s*(?:"([^"]*)"|'([^']*)'|(.+))\s*\n/m);
-  const fmName = fmMatch ? (fmMatch[1] ?? fmMatch[2] ?? fmMatch[3]?.trim() ?? "") : "";
+  const parsedProject = matter(projectRaw);
+  const fmName = typeof parsedProject.data.name === "string" ? parsedProject.data.name : "";
   const h1Match = projectRaw.match(/^#\s+(.+)$/m);
   const projectName = fmName || (h1Match?.[1]?.trim() ?? "");
 
   const activePhaseId = await getActivePhase();
   const phases = await listPhases();
   const allTasks = await loadAllTasks();
+  const epics = await listEpics();
   const decisions = await listDecisions();
   const activePhase = activePhaseId ? phases.find((p) => p.frontmatter.id === activePhaseId) ?? null : null;
 
-  const scopedTasks = activePhaseId ? await listTasks({ phase: activePhaseId }) : allTasks;
+  const epicById = new Map(epics.map((e) => [e.frontmatter.id, e]));
+  const scopedTasks = activePhaseId
+    ? allTasks.filter((t) => effectivePhaseOf(t, epicById) === activePhaseId)
+    : allTasks;
 
   const inProgress = scopedTasks
     .filter((t) => t.frontmatter.status === "in_progress")
