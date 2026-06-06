@@ -57,7 +57,7 @@ export function registerTools(server: McpServer): void {
         await regenerateOverview();
         return ok(
           { created },
-          "Draft docs/big-picture.md, then docs/sfr.md and docs/trf.md, then create_epic to start decomposing.",
+          "Read get_playbook('project-setup') for the recommended doc order, then write_doc to draft big-picture / sfr / trf.",
         );
       }),
   );
@@ -76,9 +76,12 @@ export function registerTools(server: McpServer): void {
           ? await readFileUtf8(paths().overviewFile("status.md"))
           : "(no status yet)";
         const next = getNextTask(await loadAllTasks());
+        const statusHint = next.task
+          ? `Work on ${next.task.frontmatter.id}. If you need PM guidance, call list_playbooks.`
+          : `${next.reason} If you need PM guidance, call list_playbooks.`;
         return ok(
           { status, next: next.task?.frontmatter.id ?? null, reason: next.reason },
-          next.task ? `Work on ${next.task.frontmatter.id}.` : next.reason,
+          statusHint,
         );
       }),
   );
@@ -106,7 +109,15 @@ export function registerTools(server: McpServer): void {
       run(async () => {
         requireInit();
         const written = await writeDoc(name, content);
-        return ok({ name: written }, "Overview regenerated. Continue planning or create_epic.");
+        let docHint: string;
+        if (written === "big-picture.md") {
+          docHint = "Next: write_doc on sfr.md — see get_playbook('requirements-writing').";
+        } else if (written === "sfr.md") {
+          docHint = "Next: write_doc on trf.md — see get_playbook('tech-doc-writing').";
+        } else {
+          docHint = "Overview regenerated. Continue planning or create_epic. Use list_playbooks for guidance on what to write next.";
+        }
+        return ok({ name: written }, docHint);
       }),
   );
 
@@ -129,7 +140,7 @@ export function registerTools(server: McpServer): void {
         const epic = await createEpic(a, today());
         return ok(
           { id: epic.frontmatter.id, slug: epic.slug },
-          `Decompose ${epic.frontmatter.id} into tasks with create_task.`,
+          `Read get_playbook('task-decomposition') before breaking this epic into tasks. Use create_task.`,
         );
       }),
   );
@@ -189,8 +200,8 @@ export function registerTools(server: McpServer): void {
         requireInit();
         const t = await createTask(a, today());
         const hint = (a.dependsOn?.length ?? 0) === 0
-          ? "Tip: set dependsOn so get_next_task can order work. Move to 'todo' when ready."
-          : "Move to 'todo' when ready to schedule it.";
+          ? "Tip: set dependsOn so get_next_task can order work. Move to 'todo' when ready. Read get_playbook('user-story-writing') for the User Story section."
+          : "Move to 'todo' when ready to schedule it. Read get_playbook('user-story-writing') for the User Story section.";
         return ok({ id: t.frontmatter.id, slug: t.slug }, hint);
       }),
   );
@@ -244,7 +255,10 @@ export function registerTools(server: McpServer): void {
       run(async () => {
         requireInit();
         const t = await updateTask(id, { ...rest, sections: sections as never }, today());
-        return ok({ id: t.frontmatter.id, status: t.frontmatter.status }, "Overview updated. get_next_task for what's next.");
+        const updateHint = rest.status === "in_review"
+          ? "If you made a non-obvious decision, capture it via add_decision — see get_playbook('adr-writing')."
+          : "Overview updated. get_next_task for what's next.";
+        return ok({ id: t.frontmatter.id, status: t.frontmatter.status }, updateHint);
       }),
   );
 
