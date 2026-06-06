@@ -55,6 +55,12 @@ describe("next_steps playbook references", () => {
     expect(r.next_steps).toMatch(/get_playbook.*requirements-writing/);
   });
 
+  it("write_doc on sfr.md hint references tech-doc-writing", async () => {
+    await call("init_project", { name: "Demo" });
+    const r = await call("write_doc", { name: "sfr.md", content: "# SFR\n" });
+    expect(r.next_steps).toMatch(/get_playbook.*tech-doc-writing/);
+  });
+
   it("update_task to in_review hint references adr-writing", async () => {
     await call("init_project", { name: "Demo" });
     await call("create_epic", { title: "Auth", goal: "g", description: "d" });
