@@ -1,4 +1,5 @@
 import { readdir } from "node:fs/promises";
+import matter from "gray-matter";
 import { paths } from "../paths.js";
 import { atomicWrite, exists, readFileUtf8 } from "./fsutil.js";
 import { EasyprmError } from "../errors.js";
@@ -35,8 +36,29 @@ export async function readDoc(name: string): Promise<string> {
 export async function writeDoc(name: string, content: string): Promise<string> {
   const normalized = normalizeDocName(name);
   await atomicWrite(paths().docFile(normalized), content);
+  await ensureDocIndexed(normalized);
   await regen();
   return normalized;
+}
+
+async function ensureDocIndexed(filename: string): Promise<void> {
+  const projectPath = paths().projectFile;
+  if (!(await exists(projectPath))) return;
+  const raw = await readFileUtf8(projectPath);
+  const linkFragment = `docs/${filename}`;
+  if (raw.includes(linkFragment)) return;
+  const m = matter(raw);
+  let body = m.content;
+  const displayName = filename.replace(/\.md$/, "");
+  const link = `- [${displayName}](${linkFragment})`;
+  if (/^##\s+Docs\s*$/m.test(body)) {
+    // Insert under existing Docs section (after the last existing - line or right after the heading)
+    body = body.replace(/(##\s+Docs\s*\n(?:[^\n]*\n)*?)(\n##|\n*$)/, (_full, group, tail) =>
+      `${group}${link}\n${tail}`);
+  } else {
+    body = body.trimEnd() + `\n\n## Docs\n${link}\n`;
+  }
+  await atomicWrite(projectPath, matter.stringify(body, m.data));
 }
 
 async function regen(): Promise<void> {

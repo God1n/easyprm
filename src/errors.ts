@@ -9,7 +9,10 @@ export type ErrorCode =
   | "DOD_NOT_MET"
   | "ID_CONFLICT"
   | "FILE_CONFLICT"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "PLAYBOOK_NOT_FOUND"
+  | "DECISION_NOT_FOUND"
+  | "PHASE_NOT_FOUND";
 
 export interface ErrorOpts {
   field?: string;

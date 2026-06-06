@@ -74,13 +74,23 @@ export async function getTask(taskId: string): Promise<Ticket<TaskFrontmatter>> 
 }
 
 /** epic: the epic's ID (e.g. "E1"), not the folder slug. */
-export interface ListFilter { epic?: string; status?: string; tag?: string; }
+export interface ListFilter { epic?: string; status?: string; tag?: string; phase?: string; }
 
 export async function listTasks(filter: ListFilter = {}): Promise<Ticket<TaskFrontmatter>[]> {
   let tasks = await loadAllTasks();
   if (filter.epic) tasks = tasks.filter((t) => t.frontmatter.epic === filter.epic);
   if (filter.status) tasks = tasks.filter((t) => t.frontmatter.status === filter.status);
   if (filter.tag) tasks = tasks.filter((t) => t.frontmatter.tags.includes(filter.tag!));
+  if (filter.phase) {
+    const epics = await listEpics();
+    const epicById = new Map(epics.map((e) => [e.frontmatter.id, e]));
+    tasks = tasks.filter((t) => {
+      // Epic's current phase is the authoritative source of truth; fall back to task's own
+      // stored phase only when the epic has no phase set.
+      const effective = epicById.get(t.frontmatter.epic)?.frontmatter.phase ?? t.frontmatter.phase;
+      return effective === filter.phase;
+    });
+  }
   return tasks;
 }
 
@@ -109,6 +119,7 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
       status: "backlog",
       depends_on: dependsOn,
       tags: input.tags ?? [],
+      ...(epic.frontmatter.phase ? { phase: epic.frontmatter.phase } : {}),
       created: now,
       updated: now,
     });
@@ -146,6 +157,7 @@ export async function createTask(input: CreateTaskInput, now: string): Promise<T
     status: "backlog",
     depends_on: dependsOn,
     tags: input.tags ?? [],
+    ...(epic.frontmatter.phase ? { phase: epic.frontmatter.phase } : {}),
     created: now,
     updated: now,
   });

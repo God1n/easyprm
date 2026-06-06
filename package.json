@@ -1,15 +1,41 @@
 {
   "name": "easyprm",
-  "version": "0.1.0",
-  "description": "File-based project management MCP server for solo developers building with AI.",
+  "version": "0.2.0",
+  "description": "File-based project management MCP server for solo developers building with AI. Plan end-to-end and stay on the plan — tickets, dependency DAG, kanban + architecture diagrams, all in .claude/easyprm/.",
   "type": "module",
   "bin": { "easyprm": "dist/index.js" },
-  "files": ["dist"],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-playbooks.cjs",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "ai",
+    "project-management",
+    "planning",
+    "kanban",
+    "agent-tools",
+    "solo-developer"
+  ],
+  "author": "God1n <idpm.ru@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/God1n/easyprm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/God1n/easyprm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/God1n/easyprm/issues"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

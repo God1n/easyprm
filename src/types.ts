@@ -18,6 +18,7 @@ export interface TaskFrontmatter {
   tags: string[];
   created: string;
   updated: string;
+  phase?: string;
 }
 
 export interface EpicFrontmatter {
@@ -27,6 +28,7 @@ export interface EpicFrontmatter {
   goal: string;
   created: string;
   updated: string;
+  phase?: string;
 }
 
 export interface Ticket<F> {
@@ -41,4 +43,28 @@ export interface Ok<T> {
   ok: true;
   data: T;
   next_steps: string;
+}
+
+export const PHASE_STATUSES = ["planning", "active", "shipped"] as const;
+export type PhaseStatus = (typeof PHASE_STATUSES)[number];
+
+export interface PhaseFrontmatter {
+  id: string;            // e.g. "P1"
+  title: string;
+  status: PhaseStatus;
+  goal: string;
+  created: string;
+  updated: string;
+}
+
+export const DECISION_STATUSES = ["proposed", "accepted", "superseded"] as const;
+export type DecisionStatus = (typeof DECISION_STATUSES)[number];
+
+export interface DecisionFrontmatter {
+  id: string;             // 4-digit zero-padded, e.g. "0003"
+  title: string;
+  status: DecisionStatus;
+  epic?: string;          // optional, e.g. "E2"
+  supersedes?: string;    // optional, another decision id
+  date: string;
 }
