@@ -30,6 +30,14 @@ The server manages files under the current working directory's `.claude/easyprm/
 
 `overview/` files are auto-generated — never edit them by hand.
 
+## What's new in 0.2
+
+- **PM playbooks** bundled in the package. Call `list_playbooks` for the catalog (13 entries: project-setup, big-picture-writing, requirements-writing, tech-doc-writing, epic-decomposition, task-decomposition, user-story-writing, definition-of-done, definition-of-ready, dependency-mapping, estimating, adr-writing, risk-identification), `get_playbook(name)` for full content.
+- **Phases** as optional grouping above epics — sequential releases (MVP → v2 → v3). `create_phase`, `set_active_phase`, then `create_epic` lands in the active phase by default. `list_tasks` / `get_next_task` default to the active phase.
+- **ADRs** — lightweight decision log in `decisions/` via `add_decision`, `list_decisions`, `update_decision`. Latest 3 surface in `status.md`.
+- **`get_briefing`** — one tool returns project + active phase + in-progress + recommended next + recent ADRs + recent comments. Call at session start.
+- **Sharper next_steps hints** — every tool response now points to the relevant playbook for what to do next.
+
 ## Develop
 
 ```bash

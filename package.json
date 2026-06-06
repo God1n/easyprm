@@ -1,6 +1,6 @@
 {
   "name": "easyprm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "File-based project management MCP server for solo developers building with AI. Plan end-to-end and stay on the plan — tickets, dependency DAG, kanban + architecture diagrams, all in .claude/easyprm/.",
   "type": "module",
   "bin": { "easyprm": "dist/index.js" },
