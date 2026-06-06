@@ -13,12 +13,18 @@ export interface Paths {
   taskFile: (epicFolder: string, taskFile: string) => string;
   overviewFile: (name: string) => string;
   docFile: (name: string) => string;
+  decisionsDir: string;
+  decisionFile: (fileStem: string) => string;
+  phasesDir: string;
+  phaseFile: (slug: string) => string;
 }
 
 export function paths(): Paths {
   const root = process.env.EASYPRM_ROOT ?? process.cwd();
   const base = path.join(root, ".claude", "easyprm");
   const epics = path.join(base, "epics");
+  const decisions = path.join(base, "decisions");
+  const phases = path.join(base, "phases");
   return {
     root,
     base,
@@ -32,5 +38,9 @@ export function paths(): Paths {
     taskFile: (e, t) => path.join(epics, e, "tasks", `${t}.md`),
     overviewFile: (name) => path.join(base, "overview", name),
     docFile: (name) => path.join(base, "docs", name),
+    decisionsDir: decisions,
+    decisionFile: (stem) => path.join(decisions, `${stem}.md`),
+    phasesDir: phases,
+    phaseFile: (slug) => path.join(phases, `${slug}.md`),
   };
 }

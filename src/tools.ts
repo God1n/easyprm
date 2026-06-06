@@ -1,16 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { EasyprmError, ok } from "./errors.js";
-import { statusSchema } from "./schema.js";
+import { listPlaybooks, getPlaybook } from "./playbookStore.js";
+import { createDecision, listDecisions, updateDecision } from "./store/decisions.js";
+import { statusSchema, decisionStatusSchema, phaseStatusSchema, phaseIdSchema } from "./schema.js";
 import { today } from "./clock.js";
 import { initProject, projectExists } from "./store/project.js";
 import { listDocs, readDoc, writeDoc } from "./store/docs.js";
 import { createEpic, updateEpic, listEpics } from "./store/epics.js";
 import { createTask, getTask, listTasks, updateTask, addComment, loadAllTasks } from "./store/tasks.js";
+import { createPhase, listPhases, updatePhase, setActivePhase } from "./store/phases.js";
 import { getNextTask } from "./dag.js";
 import { regenerateOverview } from "./overview/index.js";
 import { paths } from "./paths.js";
 import { readFileUtf8, exists } from "./store/fsutil.js";
+import { buildBriefing } from "./briefing.js";
 
 type Handler = () => Promise<unknown>;
 
@@ -53,7 +57,7 @@ export function registerTools(server: McpServer): void {
         await regenerateOverview();
         return ok(
           { created },
-          "Draft docs/big-picture.md, then docs/sfr.md and docs/trf.md, then create_epic to start decomposing.",
+          "Read get_playbook('project-setup') for the recommended doc order, then write_doc to draft big-picture / sfr / trf.",
         );
       }),
   );
@@ -72,9 +76,12 @@ export function registerTools(server: McpServer): void {
           ? await readFileUtf8(paths().overviewFile("status.md"))
           : "(no status yet)";
         const next = getNextTask(await loadAllTasks());
+        const statusHint = next.task
+          ? `Work on ${next.task.frontmatter.id}. If you need PM guidance, call list_playbooks.`
+          : `${next.reason} If you need PM guidance, call list_playbooks.`;
         return ok(
           { status, next: next.task?.frontmatter.id ?? null, reason: next.reason },
-          next.task ? `Work on ${next.task.frontmatter.id}.` : next.reason,
+          statusHint,
         );
       }),
   );
@@ -102,7 +109,15 @@ export function registerTools(server: McpServer): void {
       run(async () => {
         requireInit();
         const written = await writeDoc(name, content);
-        return ok({ name: written }, "Overview regenerated. Continue planning or create_epic.");
+        let docHint: string;
+        if (written === "big-picture.md") {
+          docHint = "Next: write_doc on sfr.md — see get_playbook('requirements-writing').";
+        } else if (written === "sfr.md") {
+          docHint = "Next: write_doc on trf.md — see get_playbook('tech-doc-writing').";
+        } else {
+          docHint = "Overview regenerated. Continue planning or create_epic. Use list_playbooks for guidance on what to write next.";
+        }
+        return ok({ name: written }, docHint);
       }),
   );
 
@@ -116,6 +131,7 @@ export function registerTools(server: McpServer): void {
         goal: z.string(),
         description: z.string(),
         successCriteria: z.string().optional(),
+        phase: phaseIdSchema.optional(),
       },
     },
     async (a) =>
@@ -124,7 +140,7 @@ export function registerTools(server: McpServer): void {
         const epic = await createEpic(a, today());
         return ok(
           { id: epic.frontmatter.id, slug: epic.slug },
-          `Decompose ${epic.frontmatter.id} into tasks with create_task.`,
+          `Read get_playbook('task-decomposition') before breaking this epic into tasks. Use create_task.`,
         );
       }),
   );
@@ -141,6 +157,7 @@ export function registerTools(server: McpServer): void {
         title: z.string().optional(),
         description: z.string().optional(),
         successCriteria: z.string().optional(),
+        phase: phaseIdSchema.optional(),
       },
     },
     async ({ id, ...patch }) =>
@@ -149,11 +166,11 @@ export function registerTools(server: McpServer): void {
 
   server.registerTool(
     "list_epics",
-    { title: "List epics", description: "List all epics with status.", inputSchema: {} },
-    async () =>
+    { title: "List epics", description: "List all epics with status.", inputSchema: { phase: phaseIdSchema.optional() } },
+    async ({ phase }) =>
       run(async () => {
         requireInit();
-        const epics = await listEpics();
+        const epics = await listEpics({ phase });
         return ok(
           { epics: epics.map((e) => ({ id: e.frontmatter.id, title: e.frontmatter.title, status: e.frontmatter.status })) },
           "create_task under an epic, or get_next_task.",
@@ -183,8 +200,8 @@ export function registerTools(server: McpServer): void {
         requireInit();
         const t = await createTask(a, today());
         const hint = (a.dependsOn?.length ?? 0) === 0
-          ? "Tip: set dependsOn so get_next_task can order work. Move to 'todo' when ready."
-          : "Move to 'todo' when ready to schedule it.";
+          ? "Tip: set dependsOn so get_next_task can order work. Move to 'todo' when ready. Read get_playbook('user-story-writing') for the User Story section."
+          : "Move to 'todo' when ready to schedule it. Read get_playbook('user-story-writing') for the User Story section.";
         return ok({ id: t.frontmatter.id, slug: t.slug }, hint);
       }),
   );
@@ -204,8 +221,8 @@ export function registerTools(server: McpServer): void {
     "list_tasks",
     {
       title: "List tasks",
-      description: "List tasks, optionally filtered by epic/status/tag.",
-      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional() },
+      description: "List tasks, optionally filtered by epic/status/tag/phase.",
+      inputSchema: { epic: z.string().optional(), status: statusSchema.optional(), tag: z.string().optional(), phase: phaseIdSchema.optional() },
     },
     async (f) =>
       run(async () => {
@@ -238,7 +255,10 @@ export function registerTools(server: McpServer): void {
       run(async () => {
         requireInit();
         const t = await updateTask(id, { ...rest, sections: sections as never }, today());
-        return ok({ id: t.frontmatter.id, status: t.frontmatter.status }, "Overview updated. get_next_task for what's next.");
+        const updateHint = rest.status === "in_review"
+          ? "If you made a non-obvious decision, capture it via add_decision — see get_playbook('adr-writing')."
+          : "Overview updated. get_next_task for what's next.";
+        return ok({ id: t.frontmatter.id, status: t.frontmatter.status }, updateHint);
       }),
   );
 
@@ -247,12 +267,13 @@ export function registerTools(server: McpServer): void {
     {
       title: "Get next task",
       description: "Return the single recommended next task given dependencies and current status.",
-      inputSchema: {},
+      inputSchema: { phase: phaseIdSchema.optional() },
     },
-    async () =>
+    async ({ phase }) =>
       run(async () => {
         requireInit();
-        const next = getNextTask(await loadAllTasks());
+        const tasks = phase ? await listTasks({ phase }) : await loadAllTasks();
+        const next = getNextTask(tasks);
         return ok(
           { task: next.task ? { id: next.task.frontmatter.id, title: next.task.frontmatter.title } : null, reason: next.reason },
           next.task ? `Set ${next.task.frontmatter.id} to in_progress and start.` : next.reason,
@@ -279,5 +300,184 @@ export function registerTools(server: McpServer): void {
       inputSchema: {},
     },
     async () => run(async () => { requireInit(); const files = await regenerateOverview(); return ok({ regenerated: files }, "Overview is back in sync."); }),
+  );
+
+  server.registerTool(
+    "list_playbooks",
+    {
+      title: "List playbooks",
+      description: "List all bundled PM playbooks (project-setup, epic-decomposition, definition-of-done, …). Call this when you need PM guidance.",
+      inputSchema: {},
+    },
+    async () =>
+      run(async () => {
+        const playbooks = await listPlaybooks();
+        return ok({ playbooks }, "Use get_playbook(name) to read one in full.");
+      }),
+  );
+
+  server.registerTool(
+    "get_playbook",
+    {
+      title: "Get playbook",
+      description: "Return the full markdown of a bundled PM playbook by name. Use list_playbooks first if you don't know the name.",
+      inputSchema: { name: z.string() },
+    },
+    async ({ name }) =>
+      run(async () => {
+        const pb = await getPlaybook(name);
+        return ok(pb, "Apply the guidance and continue. Call get_status for current state.");
+      }),
+  );
+
+  server.registerTool(
+    "add_decision",
+    {
+      title: "Add ADR",
+      description: "Record a lightweight architectural decision (Context, Decision, Consequences). Call after any non-obvious technical choice.",
+      inputSchema: {
+        title: z.string(),
+        status: decisionStatusSchema.optional(),
+        epic: z.string().optional(),
+        supersedes: z.string().regex(/^\d{4}$/).optional(),
+        context: z.string(),
+        decision: z.string(),
+        consequences: z.string(),
+      },
+    },
+    async (a) => run(async () => {
+      requireInit();
+      const d = await createDecision(a, today());
+      return ok({ id: d.frontmatter.id, slug: d.slug }, "ADR recorded. Reference its id in tickets if relevant.");
+    }),
+  );
+
+  server.registerTool(
+    "list_decisions",
+    {
+      title: "List ADRs",
+      description: "List ADRs, optionally filtered by epic or status.",
+      inputSchema: { epic: z.string().optional(), status: decisionStatusSchema.optional() },
+    },
+    async (f) => run(async () => {
+      requireInit();
+      const list = await listDecisions(f);
+      return ok(
+        { decisions: list.map((d) => ({ id: d.frontmatter.id, title: d.frontmatter.title, status: d.frontmatter.status, date: d.frontmatter.date, epic: d.frontmatter.epic })) },
+        "Use update_decision to change status or supersede.",
+      );
+    }),
+  );
+
+  server.registerTool(
+    "update_decision",
+    {
+      title: "Update ADR",
+      description: "Update an ADR's status/title/content. Use status='superseded' with supersedes=<new-id> to retire one.",
+      inputSchema: {
+        id: z.string().regex(/^\d{4}$/),
+        status: decisionStatusSchema.optional(),
+        title: z.string().optional(),
+        epic: z.string().optional(),
+        supersedes: z.string().regex(/^\d{4}$/).optional(),
+        context: z.string().optional(),
+        decision: z.string().optional(),
+        consequences: z.string().optional(),
+      },
+    },
+    async ({ id, ...patch }) => run(async () => {
+      requireInit();
+      const d = await updateDecision(id, patch, today());
+      return ok({ id: d.frontmatter.id, status: d.frontmatter.status }, "ADR updated.");
+    }),
+  );
+
+  server.registerTool(
+    "create_phase",
+    {
+      title: "Create phase",
+      description: "Create a phase (sequential release). Returns its assigned P# id.",
+      inputSchema: {
+        title: z.string(),
+        goal: z.string(),
+        description: z.string(),
+        successCriteria: z.string().optional(),
+      },
+    },
+    async (a) => run(async () => {
+      requireInit();
+      const p = await createPhase(a, today());
+      return ok({ id: p.frontmatter.id, slug: p.slug }, "Decide active phase via set_active_phase, then create_epic.");
+    }),
+  );
+
+  server.registerTool(
+    "list_phases",
+    {
+      title: "List phases",
+      description: "List all phases with status and goal.",
+      inputSchema: {},
+    },
+    async () => run(async () => {
+      requireInit();
+      const phases = await listPhases();
+      return ok({
+        phases: phases.map((p) => ({
+          id: p.frontmatter.id,
+          title: p.frontmatter.title,
+          status: p.frontmatter.status,
+          goal: p.frontmatter.goal,
+        })),
+      }, "set_active_phase changes focus; create_epic lands in the active phase by default.");
+    }),
+  );
+
+  server.registerTool(
+    "update_phase",
+    {
+      title: "Update phase",
+      description: "Update a phase's title/goal/status/description.",
+      inputSchema: {
+        id: phaseIdSchema,
+        status: phaseStatusSchema.optional(),
+        title: z.string().optional(),
+        goal: z.string().optional(),
+        description: z.string().optional(),
+        successCriteria: z.string().optional(),
+      },
+    },
+    async ({ id, ...patch }) => run(async () => {
+      requireInit();
+      const p = await updatePhase(id, patch, today());
+      return ok({ id: p.frontmatter.id, status: p.frontmatter.status }, "Phase updated.");
+    }),
+  );
+
+  server.registerTool(
+    "set_active_phase",
+    {
+      title: "Set active phase",
+      description: "Make a phase the active focus. Default phase for create_epic and default scope for list/next tools. Refuses shipped phases — reopen with update_phase first.",
+      inputSchema: { id: phaseIdSchema },
+    },
+    async ({ id }) => run(async () => {
+      requireInit();
+      const p = await setActivePhase(id, today());
+      return ok({ id: p.frontmatter.id, status: p.frontmatter.status }, "Subsequent create_epic and get_next_task focus on this phase.");
+    }),
+  );
+
+  server.registerTool(
+    "get_briefing",
+    {
+      title: "Get briefing",
+      description: "Single-call snapshot of project state: active phase, in-progress and blocked tasks, recommended next, latest ADRs, recent comments. Call at session start.",
+      inputSchema: {},
+    },
+    async () => run(async () => {
+      requireInit();
+      const briefing = await buildBriefing();
+      return ok(briefing, "You're caught up. Continue with the recommended next task, or call get_playbook for guidance.");
+    }),
   );
 }
